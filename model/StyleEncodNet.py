@@ -12,7 +12,7 @@ class StyleEncoder(nn.Module):
         in_channels = 3
         for v in cfg:
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, stride=2)
-            layers += [conv2d, nn.ReLU(inplace=True)]
+            layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
             in_channels = v
 
         self.feature_layer = nn.Sequential(*layers)
@@ -53,7 +53,7 @@ class VGG19(nn.Module):
             else:
                 conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
                 if batch_norm:
-                    layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
+                    layers += [conv2d, nn.BatchNorm2d(v, affine=True), nn.ReLU(inplace=True)]
                 else:
                     layers += [conv2d, nn.ReLU(inplace=True)]
                 in_channels = v
@@ -108,7 +108,7 @@ class StyleEncodingNetwork(nn.Module):
         self.style_encoder = StyleEncoder()
         self.ac_classifier = AuxiliaryClassifier(feature_dim, num_classes)
         self.H = nn.ModuleList(
-            Style_MLP(feature_dim, gamma_dim, beta_dim, omega_dim) for _ in range(num_classes))  # output conv
+            Style_MLP(feature_dim, gamma_dim, beta_dim, omega_dim) for _ in range(num_classes))
 
     def forward(self, x):
         style_vgg_feature = self.VGG(x)
@@ -153,8 +153,8 @@ if __name__ == '__main__':
 
     feature_dim = 246272
     num_classes = 4
-    gamma_dim = 64
-    beta_dim = 64
+    gamma_dim = 256
+    beta_dim = 256
     omega_dim = 4
     style_encoding_net \
         = StyleEncodingNetwork(feature_dim, num_classes, VGG, gamma_dim, beta_dim, omega_dim).to(device)

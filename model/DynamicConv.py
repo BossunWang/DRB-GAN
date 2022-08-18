@@ -72,9 +72,14 @@ class DynamicConv(nn.Module):
         for i in range(self.K):
             nn.init.kaiming_uniform_(self.weight[i])
 
-    def forward(self, x):
+    def forward(self, x, att_weights=None):
         bs, in_planels, h, w = x.shape
-        softmax_att = self.attention(x)  # bs,K
+
+        if att_weights is not None:
+            softmax_att = F.softmax(att_weights, -1)
+        else:
+            softmax_att = self.attention(x)  # bs,K
+
         x = x.view(1, -1, h, w)
         weight = self.weight.view(self.K, -1)  # K,-1
         aggregate_weight = torch.mm(softmax_att, weight).view(bs * self.out_planes, self.in_planes // self.groups,
@@ -94,7 +99,15 @@ class DynamicConv(nn.Module):
 
 
 if __name__ == '__main__':
-    input = torch.randn(1, 32, 48, 48)
-    m = DynamicConv(in_planes=32, out_planes=64, kernel_size=3, stride=1, padding=1, bias=False, temprature=1)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    K = 4
+    input = torch.randn(1, 256, 125, 125).to(device)
+    weights = torch.randn(1, K).to(device)
+
+    m = DynamicConv(in_planes=256, out_planes=128
+                    , kernel_size=3, stride=1, padding=1, bias=False, temprature=1, K=K).to(device)
     out = m(input)
-    print(out.shape)
+    print(out.size())
+
+    out = m(input, weights)
+    print(out.size())
