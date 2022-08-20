@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-import torch.nn.functional as F
 
 
 class StyleEncoder(nn.Module):
@@ -12,7 +11,7 @@ class StyleEncoder(nn.Module):
         in_channels = 3
         for v in cfg:
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, stride=2)
-            layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
+            layers += [conv2d, nn.GroupNorm(num_groups=1, num_channels=v, affine=True), nn.ReLU(inplace=True)]
             in_channels = v
 
         self.feature_layer = nn.Sequential(*layers)
