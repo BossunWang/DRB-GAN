@@ -61,11 +61,11 @@ if __name__ == '__main__':
                        , T.Resize(input_size, InterpolationMode.BICUBIC)
                        , T.RandomCrop(crop_size)
                        , T.ToTensor()
-                       , T.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))]
+                       , T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))]
     train_transform = T.Compose(train_transform)
     test_transform = [T.Resize(input_size, InterpolationMode.BICUBIC)
                       , T.ToTensor()
-                      , T.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))]
+                      , T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))]
     test_transform = T.Compose(test_transform)
 
     train_data_src = ImageDataset('../../photo2fourcollection-20210312T150938Z-001/photo2fourcollection/trainA'
@@ -91,11 +91,16 @@ if __name__ == '__main__':
 
     style_batch_iterator = iter(train_loader_tgt)
 
+    mean_array = np.array((0.485, 0.456, 0.406)).reshape(1, 1, -1)
+    std_array = np.array((0.229, 0.224, 0.225)).reshape(1, 1, -1)
+
     for content_image in tqdm(train_loader_src):
         content_image = content_image.to(device)
         content_image = content_image[0].cpu().numpy().transpose(1, 2, 0)
+
         content_image = cv2.cvtColor(content_image, cv2.COLOR_BGR2RGB)
-        content_image = np.clip((content_image + 1) / 2 * 255.0, 0, 255)
+        content_image = (content_image * std_array) + mean_array
+        content_image = np.clip(content_image * 255.0, 0, 255)
         cv2.imwrite('sample_content.png', content_image)
 
         try:
@@ -105,7 +110,7 @@ if __name__ == '__main__':
             style_image = next(style_batch_iterator)
 
         style_image = style_image[0].cpu().numpy().transpose(1, 2, 0)
-        style_image = cv2.cvtColor(style_image, cv2.COLOR_BGR2RGB)
-        style_image = np.clip((style_image + 1) / 2 * 255.0, 0, 255)
+        style_image = (style_image * std_array) + mean_array
+        style_image = np.clip(style_image * 255.0, 0, 255)
         cv2.imwrite('sample_style.png', style_image)
 
