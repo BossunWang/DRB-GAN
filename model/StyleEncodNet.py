@@ -21,55 +21,6 @@ class StyleEncoder(nn.Module):
         return feature
 
 
-class VGG19(nn.Module):
-    def __init__(self, init_weights=None, feature_mode=False, batch_norm=False, num_classes=1000):
-        super(VGG19, self).__init__()
-        self.cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512,
-                    'M']
-        self.init_weights = init_weights
-        self.feature_mode = feature_mode
-        self.batch_norm = batch_norm
-        self.num_clases = num_classes
-        self.features = self.make_layers(self.cfg, batch_norm)
-        self.classifier = nn.Sequential(
-            nn.Linear(512 * 7 * 7, 4096),
-            nn.ReLU(True),
-            nn.Dropout(),
-            nn.Linear(4096, 4096),
-            nn.ReLU(True),
-            nn.Dropout(),
-            nn.Linear(4096, num_classes),
-        )
-        if not init_weights == None:
-            self.load_state_dict(torch.load(init_weights))
-
-    def make_layers(self, cfg, batch_norm=False):
-        layers = []
-        in_channels = 3
-        for v in cfg:
-            if v == 'M':
-                layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
-            else:
-                conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
-                if batch_norm:
-                    layers += [conv2d, nn.BatchNorm2d(v, affine=True), nn.ReLU(inplace=True)]
-                else:
-                    layers += [conv2d, nn.ReLU(inplace=True)]
-                in_channels = v
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        if self.feature_mode:
-            module_list = list(self.features.modules())
-            for l in module_list[1:]:
-                x = l(x)
-        if not self.feature_mode:
-            x = x.view(x.size(0), -1)
-            x = self.classifier(x)
-
-        return x
-
-
 class AuxiliaryClassifier(nn.Module):
     def __init__(self, feature_dim, num_classes):
         super(AuxiliaryClassifier, self).__init__()
@@ -110,14 +61,16 @@ class StyleEncodingNetwork(nn.Module):
             Style_MLP(feature_dim, gamma_dim, beta_dim, omega_dim) for _ in range(num_classes))
 
     def forward(self, x):
-        style_vgg_feature = self.VGG(x)
+        style_vgg_features = self.VGG(x)
+        style_vgg_feature = style_vgg_features.relu5_1
+        # print(style_vgg_feature.size())
         style_feature = self.style_encoder(x)
 
         style_vgg_feature = style_vgg_feature.view(style_vgg_feature.size(0), -1)
         style_feature = style_feature.view(style_feature.size(0), -1)
 
         style_mixed_feature = torch.cat([style_vgg_feature, style_feature], -1)
-        print(style_mixed_feature.size())
+        # print(style_mixed_feature.size())
 
         style_prob = self.ac_classifier(style_mixed_feature)
 
@@ -125,7 +78,7 @@ class StyleEncodingNetwork(nn.Module):
         ac_weights = self.ac_classifier.get_classifier_weights().unsqueeze(0)
         style_mixed_feature_expand = style_mixed_feature.unsqueeze(1).expand(-1, ac_weights.size(1), -1)
         style_mixed_weights_feature = torch.mul(ac_weights, style_mixed_feature_expand)
-        print(style_mixed_weights_feature.size())
+        # print(style_mixed_weights_feature.size())
 
         style_gamma_code, style_beta_code, style_omega_code = [], [], []
         for i, h in enumerate(self.H):
@@ -142,15 +95,12 @@ class StyleEncodingNetwork(nn.Module):
 
 
 if __name__ == '__main__':
+    from vgg_nets import Vgg19
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    vgg_model = "../VGG_weight/vgg19-dcbb9e9d.pth"
-    VGG = VGG19(init_weights=vgg_model, feature_mode=True).to(device)
-    for param in VGG.parameters():
-        param.require_grad = False
-
+    VGG = Vgg19().to(device)
     VGG.eval()
 
-    feature_dim = 246272
+    feature_dim = 156160
     num_classes = 4
     gamma_dim = 256
     beta_dim = 256
@@ -158,7 +108,7 @@ if __name__ == '__main__':
     style_encoding_net \
         = StyleEncodingNetwork(feature_dim, num_classes, VGG, gamma_dim, beta_dim, omega_dim).to(device)
 
-    style_input = torch.rand(1, 3, 512, 512).to(device)
+    style_input = torch.rand(1, 3, 256, 256).to(device)
     style_prob, style_gamma, style_beta, style_omega = style_encoding_net(style_input)
     print("style_prob:", style_prob.size())
     print("style_gamma:", style_gamma.size())
