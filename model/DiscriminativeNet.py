@@ -55,7 +55,7 @@ class Discriminator(nn.Module):
             feature_list.append(s_feature)
 
         if shuffle:
-            random_index = np.random.permutation([i for i in range(len(feature_list))])
+            random_index = torch.randperm(len(feature_list)).long().to(x.device)
             feature = torch.cat(feature_list, dim=0)[random_index].view(N, -1, H, W)
         else:
             feature = torch.cat(feature_list, dim=0).view(N, -1, H, W)

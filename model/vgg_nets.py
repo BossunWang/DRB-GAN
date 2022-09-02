@@ -171,7 +171,7 @@ class Vgg19(torch.nn.Module):
         super().__init__()
         vgg_pretrained_features = models.vgg19(pretrained=True, progress=show_progress).features
         if use_relu:  # use relu or as in original paper conv layers
-            self.layer_names = ['relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'conv4_2', 'relu5_1']
+            self.layer_names = ['relu1_2', 'relu2_2', 'relu3_3', 'relu4_1', 'relu4_3', 'relu5_1']
             self.offset = 1
         else:
             self.layer_names = ['conv1_1', 'conv2_1', 'conv3_1', 'conv4_1', 'conv4_2', 'conv5_1']
