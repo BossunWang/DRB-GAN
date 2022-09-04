@@ -5,7 +5,7 @@
 """
 
 import os
-import random
+import numpy as np
 from PIL import Image
 import torch
 from torch.utils.data import Dataset
@@ -46,6 +46,37 @@ class ImageDataset(Dataset):
         return image
 
 
+class ImageClassDataset(Dataset):
+    def __init__(self, data_root, transform, sample_size=1):
+        self.data_root = data_root
+        self.label_dict = os.listdir(data_root)
+        self.files = make_dataset(self.data_root)
+        self.transform = transform
+        self.sample_size = sample_size
+
+    def __len__(self):
+        return len(self.label_dict)
+
+    def to_Tensor(self, image_path):
+        image = Image.open(image_path).convert('RGB')
+        image = self.transform(image)
+        return image
+
+    def __getitem__(self, index):
+        image_dir = self.label_dict[index]
+        path, dirs, files = next(os.walk(os.path.join(self.data_root, image_dir)))
+        file_index_list = np.random.permutation(len(files))[:self.sample_size]
+
+        image_list = []
+        label_list = []
+        for fi in file_index_list:
+            image_path = os.path.join(self.data_root, image_dir, files[fi])
+            image = self.to_Tensor(image_path)
+            image_list.append(image)
+            label_list.append(index)
+        return image_list, label_list
+
+
 if __name__ == '__main__':
     from torchvision import transforms as T
     from torchvision.transforms import InterpolationMode
@@ -57,6 +88,7 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     input_size = 256
     crop_size = 256
+    sample_isze = 3
     train_transform = [T.RandomHorizontalFlip()
                        , T.Resize(input_size, InterpolationMode.BICUBIC)
                        , T.RandomCrop(crop_size)
@@ -70,8 +102,9 @@ if __name__ == '__main__':
 
     train_data_src = ImageDataset('../../photo2fourcollection-20210312T150938Z-001/photo2fourcollection/trainA'
                                   , train_transform)
-    train_data_tgt = ImageDataset('../../photo2fourcollection-20210312T150938Z-001/photo2fourcollection/trainB'
-                                  , train_transform)
+    train_data_tgt = ImageClassDataset('../../photo2fourcollection-20210312T150938Z-001/photo2fourcollection/trainB'
+                                       , train_transform
+                                       , sample_isze)
     test_data_tgt = ImageDataset('../../photo2fourcollection-20210312T150938Z-001/photo2fourcollection/testA'
                                  , test_transform)
 
@@ -104,12 +137,12 @@ if __name__ == '__main__':
         cv2.imwrite('sample_content.png', content_image)
 
         try:
-            style_image = next(style_batch_iterator)
+            style_image_list, label_list = next(style_batch_iterator)
         except StopIteration:
             style_batch_iterator = iter(train_loader_tgt)
-            style_image = next(style_batch_iterator)
+            style_image_list, label_list = next(style_batch_iterator)
 
-        style_image = style_image[0].cpu().numpy().transpose(1, 2, 0)
+        style_image = style_image_list[0][0].cpu().numpy().transpose(1, 2, 0)
         style_image = (style_image * std_array) + mean_array
         style_image = np.clip(style_image * 255.0, 0, 255)
         cv2.imwrite('sample_style.png', style_image)
