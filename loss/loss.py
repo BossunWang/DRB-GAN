@@ -113,11 +113,8 @@ class DRBGANLoss:
             style_loss
         ]
 
-    def compute_loss_D(self, fake_img_d, real_img_d):
-        return self.wadvd * (
-                self.adv_loss_d_real(real_img_d) +
-                self.adv_loss_d_fake(fake_img_d)
-        )
+    def compute_loss_D(self, fake_img_logits, real_img_logits):
+        return self.wadvd * self.adv_loss_d(fake_img_logits, real_img_logits)
 
     def content_loss_vgg(self, image, recontruction):
         feat = self.vgg19(image)
@@ -125,41 +122,33 @@ class DRBGANLoss:
 
         return self.content_loss(feat, re_feat)
 
-    def adv_loss_d_real(self, pred):
-        if self.adv_type == 'hinge':
-            return torch.mean(F.relu(1.0 - pred))
+    def adv_loss_d(self, fake_img_logits, real_img_logits):
+        loss = 0
+        for it, (fake_img_logit, real_img_logit) in enumerate(zip(fake_img_logits, real_img_logits)):
+            if self.adv_type == 'lsgan':
+                loss += torch.mean((fake_img_logit - 0) ** 2) + torch.mean((real_img_logit - 1) ** 2)
+            elif self.adv_type == 'nsgan':
+                all0 = Variable(torch.zeros_like(fake_img_logit.data).cuda(), requires_grad=False)
+                all1 = Variable(torch.ones_like(real_img_logit.data).cuda(), requires_grad=False)
+                loss += torch.mean(F.binary_cross_entropy(F.sigmoid(fake_img_logit), all0) +
+                                   F.binary_cross_entropy(F.sigmoid(real_img_logit), all1))
+            else:
+                assert 0, "Unsupported GAN type: {}".format(self.adv_type)
 
-        elif self.adv_type == 'lsgan':
-            return torch.mean(torch.square(pred - 1.0))
+        return loss
 
-        elif self.adv_type == 'normal':
-            return self.bce_loss(pred, torch.ones_like(pred))
+    def adv_loss_g(self, fake_img_logits):
+        loss = 0
+        for it, (out0) in enumerate(fake_img_logits):
+            if self.adv_type == 'lsgan':
+                loss += torch.mean((out0 - 1) ** 2)  # LSGAN
+            elif self.adv_type == 'nsgan':
+                all1 = Variable(torch.ones_like(out0.data).cuda(), requires_grad=False)
+                loss += torch.mean(F.binary_cross_entropy(F.sigmoid(out0), all1))
+            else:
+                assert 0, "Unsupported GAN type: {}".format(self.adv_type)
 
-        raise ValueError(f'Do not support loss type {self.adv_type}')
-
-    def adv_loss_d_fake(self, pred):
-        if self.adv_type == 'hinge':
-            return torch.mean(F.relu(1.0 + pred))
-
-        elif self.adv_type == 'lsgan':
-            return torch.mean(torch.square(pred))
-
-        elif self.adv_type == 'normal':
-            return self.bce_loss(pred, torch.zeros_like(pred))
-
-        raise ValueError(f'Do not support loss type {self.adv_type}')
-
-    def adv_loss_g(self, pred):
-        if self.adv_type == 'hinge':
-            return -torch.mean(pred)
-
-        elif self.adv_type == 'lsgan':
-            return torch.mean(torch.square(pred - 1.0))
-
-        elif self.adv_type == 'normal':
-            return self.bce_loss(pred, torch.zeros_like(pred))
-
-        raise ValueError(f'Do not support loss type {self.adv_type}')
+        return loss
 
 
 if __name__ == '__main__':
@@ -185,26 +174,26 @@ if __name__ == '__main__':
     args.device = device
 
     num_styles = 4
+    num_scales = 3
     fake_image = torch.rand((1, 3, 256, 256)).to(device)
     content_image = torch.rand((1, 3, 256, 256)).to(device)
     style_image = torch.rand((1, 3, 256, 256)).to(device)
     style_label = torch.randint(0, num_styles, (1,)).to(device)
-    fake_logit = torch.rand((1, 1, 7, 7)).to(device)
+    fake_logits = [torch.rand((1, 1, 7, 7), requires_grad=True).to(device) for _ in range(num_scales)]
+    real_logits = [torch.rand((1, 1, 7, 7)).to(device) for _ in range(num_scales)]
     style_logit = torch.rand((1, num_styles)).to(device)
-    fake_image.requires_grad = True
-    fake_logit.requires_grad = True
 
     VGG = Vgg19().to(device)
     VGG.eval()
     loss = DRBGANLoss(args, VGG)
 
-    adv_loss_d = loss.compute_loss_D(fake_logit, style_logit)
+    adv_loss_d = loss.compute_loss_D(fake_logits, real_logits)
     d_loss = adv_loss_d
     print("d_loss:", d_loss)
     d_loss.backward(retain_graph=True)
 
     adv_loss_g, per_loss, style_cls_loss, content_loss, style_loss \
-        = loss.compute_loss_G(fake_image, content_image, style_image, fake_logit, style_logit, style_label)
+        = loss.compute_loss_G(fake_image, content_image, style_image, fake_logits, style_logit, style_label)
 
     g_loss = adv_loss_g + per_loss + style_cls_loss
     print("g_loss:", g_loss)
