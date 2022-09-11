@@ -73,8 +73,8 @@ class ImageClassDataset(Dataset):
             image_path = os.path.join(self.data_root, image_dir, files[fi])
             image = self.to_Tensor(image_path)
             image_list.append(image)
-            label_list.append(index)
-        return image_list, label_list
+            label_list.append(torch.Tensor([index]))
+        return torch.cat(image_list), torch.cat(label_list).long()
 
 
 if __name__ == '__main__':
@@ -127,23 +127,35 @@ if __name__ == '__main__':
     mean_array = np.array((0.485, 0.456, 0.406)).reshape(1, 1, -1)
     std_array = np.array((0.229, 0.224, 0.225)).reshape(1, 1, -1)
 
-    for content_image in tqdm(train_loader_src):
+    # for content_image in tqdm(train_loader_src):
+    #     content_image = content_image.to(device)
+    #     content_image = content_image[0].cpu().numpy().transpose(1, 2, 0)
+    #
+    #     content_image = cv2.cvtColor(content_image, cv2.COLOR_BGR2RGB)
+    #     content_image = (content_image * std_array) + mean_array
+    #     content_image = np.clip(content_image * 255.0, 0, 255)
+    #     cv2.imwrite('sample_train_content.png', content_image)
+    #
+    #     try:
+    #         style_image_list, label_list = next(style_batch_iterator)
+    #     except StopIteration:
+    #         style_batch_iterator = iter(train_loader_tgt)
+    #         style_image_list, label_list = next(style_batch_iterator)
+    #
+    #     print("style_image_list:", style_image_list.size())
+    #     print("label_list:", label_list.size())
+    #
+    #     style_image = style_image_list[0, :3, :, :].cpu().numpy().transpose(1, 2, 0)
+    #     style_image = (style_image * std_array) + mean_array
+    #     style_image = np.clip(style_image * 255.0, 0, 255)
+    #     cv2.imwrite('sample_train_style.png', style_image)
+
+    for content_image in tqdm(test_loader_src):
         content_image = content_image.to(device)
         content_image = content_image[0].cpu().numpy().transpose(1, 2, 0)
 
         content_image = cv2.cvtColor(content_image, cv2.COLOR_BGR2RGB)
         content_image = (content_image * std_array) + mean_array
         content_image = np.clip(content_image * 255.0, 0, 255)
-        cv2.imwrite('sample_content.png', content_image)
-
-        try:
-            style_image_list, label_list = next(style_batch_iterator)
-        except StopIteration:
-            style_batch_iterator = iter(train_loader_tgt)
-            style_image_list, label_list = next(style_batch_iterator)
-
-        style_image = style_image_list[0][0].cpu().numpy().transpose(1, 2, 0)
-        style_image = (style_image * std_array) + mean_array
-        style_image = np.clip(style_image * 255.0, 0, 255)
-        cv2.imwrite('sample_style.png', style_image)
+        cv2.imwrite('sample_test_content.png', content_image)
 

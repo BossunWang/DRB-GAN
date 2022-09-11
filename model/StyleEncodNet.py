@@ -1,17 +1,18 @@
 import torch
 from torch import nn
 
+from basic_layer import ConvNormLReLU
+
 
 class StyleEncoder(nn.Module):
     def __init__(self):
         super(StyleEncoder, self).__init__()
 
-        cfg = [64, 64, 128, 256, 512]
+        cfg = [32, 64, 128, 256, 512]
         layers = []
         in_channels = 3
         for v in cfg:
-            conv2d = nn.Conv2d(in_channels, v, kernel_size=3, stride=2)
-            layers += [conv2d, nn.GroupNorm(num_groups=1, num_channels=v, affine=True), nn.ReLU(inplace=True)]
+            layers += [ConvNormLReLU(in_channels, v, kernel_size=3, stride=2)]
             in_channels = v
 
         self.feature_layer = nn.Sequential(*layers)
@@ -57,10 +58,9 @@ class StyleEncodingNetwork(nn.Module):
         self.VGG = VGG_model
         self.style_encoder = StyleEncoder()
         self.ac_classifier = AuxiliaryClassifier(feature_dim, num_classes)
-        self.H = nn.ModuleList(
-            Style_MLP(feature_dim, gamma_dim, beta_dim, omega_dim) for _ in range(num_classes))
+        self.H = Style_MLP(feature_dim, gamma_dim, beta_dim, omega_dim)
 
-    def forward(self, x):
+    def forward(self, x, style_label):
         style_vgg_features = self.VGG(x)
         style_vgg_feature = style_vgg_features.relu5_1
         # print(style_vgg_feature.size())
@@ -75,21 +75,15 @@ class StyleEncodingNetwork(nn.Module):
         style_prob = self.ac_classifier(style_mixed_feature)
 
         # style_mixed_feature multiply by classifier weights
-        ac_weights = self.ac_classifier.get_classifier_weights().unsqueeze(0)
-        style_mixed_feature_expand = style_mixed_feature.unsqueeze(1).expand(-1, ac_weights.size(1), -1)
-        style_mixed_weights_feature = torch.mul(ac_weights, style_mixed_feature_expand)
+        ac_weights = self.ac_classifier.get_classifier_weights().detach()
+        style_mixed_weights_feature = ac_weights[style_label[0]].unsqueeze(0) * style_mixed_feature
         # print(style_mixed_weights_feature.size())
 
-        style_gamma_code, style_beta_code, style_omega_code = [], [], []
-        for i, h in enumerate(self.H):
-            style_gamma, style_beta, style_omega = h(style_mixed_weights_feature[:, i])
-            style_gamma_code.append(style_gamma)
-            style_beta_code.append(style_beta)
-            style_omega_code.append(style_omega)
+        style_gamma, style_beta, style_omega = self.H(style_mixed_weights_feature)
 
-        style_gamma_code = torch.cat(style_gamma_code).unsqueeze(-1).unsqueeze(-1)
-        style_beta_code = torch.cat(style_beta_code).unsqueeze(-1).unsqueeze(-1)
-        style_omega_code = torch.cat(style_omega_code)
+        style_gamma_code = style_gamma.unsqueeze(-1).unsqueeze(-1)
+        style_beta_code = style_beta.unsqueeze(-1).unsqueeze(-1)
+        style_omega_code = style_omega
 
         return style_prob, style_gamma_code, style_beta_code, style_omega_code
 
@@ -105,11 +99,13 @@ if __name__ == '__main__':
     gamma_dim = 256
     beta_dim = 256
     omega_dim = 4
+    style_label = torch.randint(0, num_classes, (1,)).to(device)
+
     style_encoding_net \
         = StyleEncodingNetwork(feature_dim, num_classes, VGG, gamma_dim, beta_dim, omega_dim).to(device)
 
     style_input = torch.rand(1, 3, 256, 256).to(device)
-    style_prob, style_gamma, style_beta, style_omega = style_encoding_net(style_input)
+    style_prob, style_gamma, style_beta, style_omega = style_encoding_net(style_input, style_label)
     print("style_prob:", style_prob.size())
     print("style_gamma:", style_gamma.size())
     print("style_beta:", style_beta.size())

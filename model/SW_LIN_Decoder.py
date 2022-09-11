@@ -74,7 +74,7 @@ if __name__ == '__main__':
     ws = 64
     sw_in = SW_LIN(normalized_shape, ws).to(device)
 
-    content_feature = torch.rand(1, normalized_shape, 127, 127).to(device)
+    content_feature = torch.rand(1, normalized_shape, 63, 63).to(device)
     content_normal = sw_in(content_feature)
     print(content_normal.size())
 

@@ -4,6 +4,7 @@ from torch import nn
 from ADIN import ADIN_Dynamic
 from DynamicConv import DynamicConv
 from SW_LIN_Decoder import SW_LIN_Decoder
+from basic_layer import ConvNormLReLU
 
 
 class ContentEncoder(nn.Module):
@@ -14,8 +15,7 @@ class ContentEncoder(nn.Module):
         layers = []
         in_channels = 3
         for v in cfg:
-            conv2d = nn.Conv2d(in_channels, v, kernel_size=3, stride=2)
-            layers += [conv2d, nn.GroupNorm(num_groups=1, num_channels=v, affine=True), nn.ReLU(inplace=True)]
+            layers += [ConvNormLReLU(in_channels, v, kernel_size=3, stride=2)]
             in_channels = v
 
         self.feature_layer = nn.Sequential(*layers)
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     style_transfer_net \
         = StyleTransferNetwork(encoder_out_ch, gamma_dim, beta_dim, omega_dim, db_number, ws).to(device)
 
-    content_input = torch.rand(1, 3, 512, 512).to(device)
+    content_input = torch.rand(1, 3, 256, 256).to(device)
     style_gamma = torch.rand(1, gamma_dim, 1, 1).to(device)
     style_beta = torch.rand(1, beta_dim, 1, 1).to(device)
     style_omega = torch.rand(1, omega_dim).to(device)

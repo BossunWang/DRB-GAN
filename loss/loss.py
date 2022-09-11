@@ -62,7 +62,7 @@ def total_variation_loss(image):
 
 
 class DRBGANLoss:
-    def __init__(self, args):
+    def __init__(self, args, vgg19):
         self.content_loss = nn.MSELoss().to(args.device)
         self.style_mean_loss = nn.L1Loss().to(args.device)
         self.gram_loss = nn.L1Loss().to(args.device)
@@ -74,7 +74,7 @@ class DRBGANLoss:
         self.wsty = args.sty_weight
         self.wcls = args.class_weight
         self.wper = args.perceptual_weight
-        self.vgg19 = Vgg19().to(args.device).eval()
+        self.vgg19 = vgg19
         self.adv_type = args.gan_loss
 
     def compute_loss_G(self, fake_img, img, style_img, fake_logit, style_logit, style_label):
@@ -189,13 +189,16 @@ if __name__ == '__main__':
     content_image = torch.rand((1, 3, 256, 256)).to(device)
     style_image = torch.rand((1, 3, 256, 256)).to(device)
     style_label = torch.randint(0, num_styles, (1,)).to(device)
-    fake_logit = torch.rand((1, 1, 15, 15)).to(device)
+    fake_logit = torch.rand((1, 1, 7, 7)).to(device)
     style_logit = torch.rand((1, num_styles)).to(device)
     fake_image.requires_grad = True
+    fake_logit.requires_grad = True
 
-    loss = DRBGANLoss(args)
+    VGG = Vgg19().to(device)
+    VGG.eval()
+    loss = DRBGANLoss(args, VGG)
 
-    adv_loss_d = loss.compute_loss_D(fake_image, style_image)
+    adv_loss_d = loss.compute_loss_D(fake_logit, style_logit)
     d_loss = adv_loss_d
     print("d_loss:", d_loss)
     d_loss.backward(retain_graph=True)

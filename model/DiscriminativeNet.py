@@ -1,33 +1,16 @@
 import torch
 from torch import nn
-from torch.nn.utils import spectral_norm
 import numpy as np
 
-
-class ConvSpectralNorm(nn.Module):
-    def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, padding=1, groups=1, bias=False):
-        super(ConvSpectralNorm, self).__init__()
-
-        layers = [spectral_norm(nn.Conv2d(in_ch
-                                          , out_ch
-                                          , kernel_size=kernel_size
-                                          , stride=stride
-                                          , padding=0
-                                          , groups=groups
-                                          , bias=bias))]
-        self.layers = nn.Sequential(*layers)
-
-    def forward(self, input):
-        out = self.layers(input)
-        return out
+from basic_layer import ConvSpectralNorm, ConvNormLReLU
 
 
 class Discriminator(nn.Module):
     def __init__(self, M):
         super(Discriminator, self).__init__()
 
-        feature_extraction_cfg = [64, 64]
-        d_cfg = [128, 256]
+        feature_extraction_cfg = [64, 128]
+        d_cfg = [256, 512]
         feature_layers = []
         d_layers = []
         in_channels = 3
@@ -44,21 +27,22 @@ class Discriminator(nn.Module):
         self.feature_layer = nn.Sequential(*feature_layers)
         self.D = nn.Sequential(*d_layers)
 
-    def forward(self, x, s_list, shuffle=False):
-        feature_list = []
+    def forward(self, x, collection_s, shuffle=False):
+        feature_list = torch.tensor([], dtype=torch.float, device=x.device)
         x_feature = self.feature_layer(x)
         N, C, H, W = x_feature.size()
-        feature_list.append(x_feature)
+        feature_list = torch.cat([feature_list, x_feature])
 
-        for s in s_list:
-            s_feature = self.feature_layer(s)
-            feature_list.append(s_feature)
+        collection_s = collection_s.view(-1, x.size(1), x.size(2), x.size(3))
+        for s in collection_s:
+            s_feature = self.feature_layer(s.unsqueeze(0))
+            feature_list = torch.cat([feature_list, s_feature])
 
         if shuffle:
             random_index = torch.randperm(len(feature_list)).long().to(x.device)
-            feature = torch.cat(feature_list, dim=0)[random_index].view(N, -1, H, W)
+            feature = feature_list[random_index].view(N, -1, H, W)
         else:
-            feature = torch.cat(feature_list, dim=0).view(N, -1, H, W)
+            feature = feature_list.view(N, -1, H, W)
 
         out_prep = self.D(feature)
 
@@ -69,9 +53,8 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     M = 2
     discriminator = Discriminator(M + 1).to(device)
-    content_input = torch.rand(1, 3, 512, 512).to(device)
-
-    style_collection_inputs = [torch.rand(1, 3, 512, 512).to(device) for _ in range(M)]
+    content_input = torch.rand(1, 3, 256, 256).to(device)
+    style_collection_inputs = torch.rand(1, 3 * M, 256, 256).to(device)
 
     out_prep = discriminator(content_input, style_collection_inputs, shuffle=True)
-    print("out_prep:", out_prep.size())
+    print("out_prep:", out_prep)
