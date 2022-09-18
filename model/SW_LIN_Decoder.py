@@ -1,39 +1,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-
-
-class SW_LIN(nn.Module):
-    def __init__(self, normalized_shape, ws, eps=1e-6):
-        super(SW_LIN, self).__init__()
-        self.weight = nn.Parameter(torch.ones(normalized_shape))
-        self.bias = nn.Parameter(torch.zeros(normalized_shape))
-        self.eps = eps
-        self.rho = nn.Parameter(torch.ones(1) * 0.5)
-        self.ws = ws
-
-    def forward(self, x):
-        # calculate center region
-        size = x.size()
-        sw1 = (x.size(3) - self.ws) // 2
-        sw2 = x.size(3) - (x.size(3) - self.ws) // 2
-        sh1 = (x.size(2) - self.ws) // 2
-        sh2 = x.size(2) - (x.size(2) - self.ws) // 2
-        x_loc = x[:, :, sh1: sh2, sw1: sw2]
-        # Layer Normalization
-        ul = x_loc.reshape(x_loc.size(0), -1).mean(-1, keepdims=True)
-        sl = (x_loc.reshape(x_loc.size(0), -1) - ul).pow(2).mean(-1, keepdims=True)
-        x_ln = (x - ul.expand(size)) / torch.sqrt(sl.expand(size) + self.eps)
-
-        # Instance Normalization
-        ui = x_loc.reshape(x_loc.size(0), x_loc.size(1), -1).mean(-1, keepdims=True)
-        si = (x_loc.reshape(x_loc.size(0), x_loc.size(1), -1) - ui).pow(2).mean(-1, keepdims=True)
-        x_in = (x - ui.view(x.size(0), x.size(1), 1, 1).expand(size)) \
-               / torch.sqrt(si.view(x.size(0), x.size(1), 1, 1).expand(size) + self.eps)
-
-        x = self.weight[:, None, None] * (self.rho * x_in + (1. - self.rho) * x_ln) + self.bias[:, None, None]
-
-        return x
+from basic_layer import SW_LIN
 
 
 class SW_LIN_Decoder(nn.Module):

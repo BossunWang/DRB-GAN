@@ -1,18 +1,19 @@
 import torch
 from torch import nn
 
-from basic_layer import ConvNormLReLU
+from basic_layer import Conv2dBlock, LinearBlock
 
 
 class StyleEncoder(nn.Module):
     def __init__(self):
         super(StyleEncoder, self).__init__()
 
-        cfg = [32, 64, 128, 256, 512]
+        cfg = [64, 128, 256, 512, 512]
         layers = []
         in_channels = 3
         for v in cfg:
-            layers += [ConvNormLReLU(in_channels, v, kernel_size=3, stride=2)]
+            layers += [Conv2dBlock(in_channels, v, kernel_size=3, stride=2, padding=0
+                                   , pad_type="zero", norm="ln", activation="relu")]
             in_channels = v
 
         self.feature_layer = nn.Sequential(*layers)
@@ -65,6 +66,7 @@ class StyleEncodingNetwork(nn.Module):
         style_vgg_feature = style_vgg_features.relu5_1
         # print(style_vgg_feature.size())
         style_feature = self.style_encoder(x)
+        # print(style_feature.size())
 
         style_vgg_feature = style_vgg_feature.view(style_vgg_feature.size(0), -1)
         style_feature = style_feature.view(style_feature.size(0), -1)
@@ -81,11 +83,7 @@ class StyleEncodingNetwork(nn.Module):
 
         style_gamma, style_beta, style_omega = self.H(style_mixed_weights_feature)
 
-        style_gamma_code = style_gamma.unsqueeze(-1).unsqueeze(-1)
-        style_beta_code = style_beta.unsqueeze(-1).unsqueeze(-1)
-        style_omega_code = style_omega
-
-        return style_prob, style_gamma_code, style_beta_code, style_omega_code
+        return style_prob, style_gamma, style_beta, style_omega
 
 
 if __name__ == '__main__':
@@ -94,11 +92,12 @@ if __name__ == '__main__':
     VGG = Vgg19().to(device)
     VGG.eval()
 
-    feature_dim = 156160
+    feature_dim = 1 * 512 * 16 * 16 + 1 * 512 * 7 * 7
     num_classes = 4
     gamma_dim = 256
     beta_dim = 256
-    omega_dim = 4
+    K = 4
+    omega_dim = K
     style_label = torch.randint(0, num_classes, (1,)).to(device)
 
     style_encoding_net \

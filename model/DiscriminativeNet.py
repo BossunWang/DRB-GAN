@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import numpy as np
 
-from basic_layer import ConvSpectralNorm, ConvNormLReLU, Conv2dBlock
+from basic_layer import Conv2dBlock
 
 
 class Discriminator(nn.Module):

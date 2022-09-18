@@ -1,68 +1,98 @@
 import torch
 from torch import nn
-from torch.nn.utils import spectral_norm
-
-
-class ConvNormLReLU(nn.Sequential):
-    def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, groups=1, bias=False):
-        super(ConvNormLReLU, self).__init__(
-            nn.Conv2d(in_ch, out_ch, kernel_size=kernel_size, stride=stride, padding=0, groups=groups, bias=bias),
-            nn.GroupNorm(num_groups=1, num_channels=out_ch, affine=True),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-
-
-class ConvSpectralNorm(nn.Module):
-    def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, padding=1, groups=1, bias=False):
-        super(ConvSpectralNorm, self).__init__()
-
-        layers = [spectral_norm(nn.Conv2d(in_ch
-                                          , out_ch
-                                          , kernel_size=kernel_size
-                                          , stride=stride
-                                          , padding=0
-                                          , groups=groups
-                                          , bias=bias))]
-        self.layers = nn.Sequential(*layers)
-
-    def forward(self, input):
-        out = self.layers(input)
-        return out
+import torch.nn.functional as F
 
 
 ##################################################################################
 # Normalization layers
 ##################################################################################
-class AdaptiveInstanceNorm2d(nn.Module):
-    def __init__(self, num_features, eps=1e-5, momentum=0.1):
-        super(AdaptiveInstanceNorm2d, self).__init__()
-        self.num_features = num_features
+class AdaIN(nn.Module):
+    def __init__(self, eps=1e-5):
+        super(AdaIN, self).__init__()
         self.eps = eps
-        self.momentum = momentum
-        # weight and bias are dynamically assigned
-        self.weight = None
-        self.bias = None
-        # just dummy buffers, not used
-        self.register_buffer('running_mean', torch.zeros(num_features))
-        self.register_buffer('running_var', torch.ones(num_features))
+
+    def forward(self, input, gamma, beta):
+        in_mean, in_var = torch.mean(input, dim=[2, 3], keepdim=True), torch.var(input, dim=[2, 3], keepdim=True)
+        out = (input - in_mean) / torch.sqrt(in_var + self.eps)
+        out = out * gamma.unsqueeze(2).unsqueeze(3) + beta.unsqueeze(2).unsqueeze(3)
+
+        return out
+
+
+class AdaILN(nn.Module):
+    def __init__(self, num_features, eps=1e-5):
+        super(AdaILN, self).__init__()
+        self.eps = eps
+        self.rho = nn.Parameter(torch.Tensor(1, num_features, 1, 1))
+        self.rho.data.fill_(0.9)
+
+    def forward(self, input, gamma, beta):
+        in_mean, in_var = torch.mean(input, dim=[2, 3], keepdim=True), torch.var(input, dim=[2, 3], keepdim=True)
+        out_in = (input - in_mean) / torch.sqrt(in_var + self.eps)
+        ln_mean, ln_var = torch.mean(input, dim=[1, 2, 3], keepdim=True), torch.var(input, dim=[1, 2, 3], keepdim=True)
+        out_ln = (input - ln_mean) / torch.sqrt(ln_var + self.eps)
+        out = self.rho.expand(input.shape[0], -1, -1, -1) * out_in + (1-self.rho.expand(input.shape[0], -1, -1, -1)) * out_ln
+        out = out * gamma.unsqueeze(2).unsqueeze(3) + beta.unsqueeze(2).unsqueeze(3)
+
+        return out
+
+
+class ILN(nn.Module):
+    def __init__(self, num_features, eps=1e-5):
+        super(ILN, self).__init__()
+        self.eps = eps
+        self.rho = nn.Parameter(torch.Tensor(1, num_features, 1, 1))
+        self.gamma = nn.Parameter(torch.Tensor(1, num_features, 1, 1))
+        self.beta = nn.Parameter(torch.Tensor(1, num_features, 1, 1))
+        self.rho.data.fill_(0.0)
+        self.gamma.data.fill_(1.0)
+        self.beta.data.fill_(0.0)
+
+    def forward(self, input):
+        in_mean, in_var = torch.mean(input, dim=[2, 3], keepdim=True), torch.var(input, dim=[2, 3], keepdim=True)
+        out_in = (input - in_mean) / torch.sqrt(in_var + self.eps)
+        ln_mean, ln_var = torch.mean(input, dim=[1, 2, 3], keepdim=True), torch.var(input, dim=[1, 2, 3], keepdim=True)
+        out_ln = (input - ln_mean) / torch.sqrt(ln_var + self.eps)
+        out = self.rho.expand(input.shape[0], -1, -1, -1) * out_in + (1-self.rho.expand(input.shape[0], -1, -1, -1)) * out_ln
+        out = out * self.gamma.expand(input.shape[0], -1, -1, -1) + self.beta.expand(input.shape[0], -1, -1, -1)
+
+        return out
+
+
+class SW_LIN(nn.Module):
+    def __init__(self, num_features, ws, eps=1e-5):
+        super(SW_LIN, self).__init__()
+        self.eps = eps
+        self.rho = nn.Parameter(torch.Tensor(1, num_features, 1, 1))
+        self.gamma = nn.Parameter(torch.Tensor(1, num_features, 1, 1))
+        self.beta = nn.Parameter(torch.Tensor(1, num_features, 1, 1))
+        self.ws = ws
+        self.rho.data.fill_(0.0)
+        self.gamma.data.fill_(1.0)
+        self.beta.data.fill_(0.0)
 
     def forward(self, x):
-        assert self.weight is not None and self.bias is not None, "Please assign weight and bias before calling AdaIN!"
-        b, c = x.size(0), x.size(1)
-        running_mean = self.running_mean.repeat(b)
-        running_var = self.running_var.repeat(b)
+        # calculate center region
+        size = x.size()
+        sw1 = (x.size(3) - self.ws) // 2
+        sw2 = x.size(3) - (x.size(3) - self.ws) // 2
+        sh1 = (x.size(2) - self.ws) // 2
+        sh2 = x.size(2) - (x.size(2) - self.ws) // 2
+        x_loc = x[:, :, sh1: sh2, sw1: sw2]
 
-        # Apply instance norm
-        x_reshaped = x.contiguous().view(1, b * c, *x.size()[2:])
+        # Layer Normalization
+        ln_mean, ln_var = torch.mean(x_loc, dim=[1, 2, 3], keepdim=True), torch.var(x_loc, dim=[1, 2, 3], keepdim=True)
+        out_ln = (x - ln_mean) / torch.sqrt(ln_var + self.eps)
 
-        out = F.batch_norm(
-            x_reshaped, running_mean, running_var, self.weight, self.bias,
-            True, self.momentum, self.eps)
+        # Instance Normalization
+        in_mean, in_var = torch.mean(x_loc, dim=[2, 3], keepdim=True), torch.var(x_loc, dim=[2, 3], keepdim=True)
+        out_in = (x - in_mean) / torch.sqrt(in_var + self.eps)
 
-        return out.view(b, c, *x.size()[2:])
+        out = self.rho.expand(x.shape[0], -1, -1, -1) * out_in + (
+                    1 - self.rho.expand(x.shape[0], -1, -1, -1)) * out_ln
+        out = out * self.gamma.expand(x.shape[0], -1, -1, -1) + self.beta.expand(x.shape[0], -1, -1, -1)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(' + str(self.num_features) + ')'
+        return out
 
 
 class LayerNorm(nn.Module):
@@ -159,6 +189,9 @@ class SpectralNorm(nn.Module):
         return self.module.forward(*args)
 
 
+##################################################################################
+# Block layers
+##################################################################################
 class ResBlock(nn.Module):
     def __init__(self, dim, norm='in', activation='relu', pad_type='zero'):
         super(ResBlock, self).__init__()
@@ -200,7 +233,7 @@ class Conv2dBlock(nn.Module):
         elif norm == 'ln':
             self.norm = LayerNorm(norm_dim)
         elif norm == 'adain':
-            self.norm = AdaptiveInstanceNorm2d(norm_dim)
+            self.norm = AdaIN()
         elif norm == 'none' or norm == 'sn':
             self.norm = None
         else:
@@ -283,3 +316,18 @@ class LinearBlock(nn.Module):
         if self.activation:
             out = self.activation(out)
         return out
+
+
+class RhoClipper(object):
+
+    def __init__(self, min, max):
+        self.clip_min = min
+        self.clip_max = max
+        assert min < max
+
+    def __call__(self, module):
+
+        if hasattr(module, 'rho'):
+            w = module.rho.data
+            w = w.clamp(self.clip_min, self.clip_max)
+            module.rho.data = w

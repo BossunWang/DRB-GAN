@@ -66,20 +66,13 @@ class DynamicConv(nn.Module):
         if self.init_weight:
             self._initialize_weights()
 
-        # TODO 初始化
-
     def _initialize_weights(self):
         for i in range(self.K):
             nn.init.kaiming_uniform_(self.weight[i])
 
-    def forward(self, x, att_weights=None):
+    def forward(self, x):
         bs, in_planels, h, w = x.shape
-
-        if att_weights is not None:
-            softmax_att = F.softmax(att_weights, -1)
-        else:
-            softmax_att = self.attention(x)  # bs,K
-
+        softmax_att = self.attention(x)  # bs,K
         x = x.view(1, -1, h, w)
         weight = self.weight.view(self.K, -1)  # K,-1
         aggregate_weight = torch.mm(softmax_att, weight).view(bs * self.out_planes, self.in_planes // self.groups,
@@ -93,6 +86,43 @@ class DynamicConv(nn.Module):
         else:
             output = F.conv2d(x, weight=aggregate_weight, bias=None, stride=self.stride, padding=self.padding,
                               groups=self.groups * bs, dilation=self.dilation)
+        output = output.view(bs, self.out_planes, h, w)
+        return output
+
+
+class AdaDynamicConv(nn.Module):
+    def __init__(self, in_planes, out_planes, kernel_size, stride
+                 , padding=0, dilation=1, grounps=1, K=4, init_weight=True):
+        super().__init__()
+        self.in_planes = in_planes
+        self.out_planes = out_planes
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.dilation = dilation
+        self.groups = grounps
+        self.K = K
+        self.init_weight = init_weight
+        self.weight = nn.Parameter(torch.randn(K, out_planes, in_planes // grounps, kernel_size, kernel_size),
+                                   requires_grad=True)
+        if self.init_weight:
+            self._initialize_weights()
+
+    def _initialize_weights(self):
+        for i in range(self.K):
+            nn.init.kaiming_uniform_(self.weight[i])
+
+    def forward(self, x, att_weights):
+        bs, in_planels, h, w = x.shape
+        softmax_att = F.softmax(att_weights)
+
+        x = x.view(1, -1, h, w)
+        weights = self.weight.view(self.K, -1)  # K,-1
+        aggregate_weight = torch.mm(softmax_att, weights).view(bs * self.out_planes, self.in_planes // self.groups,
+                                                               self.kernel_size, self.kernel_size)  # bs*out_p,in_p,k,k
+
+        output = F.conv2d(x, weight=aggregate_weight, bias=None, stride=self.stride, padding=self.padding,
+                          groups=self.groups * bs, dilation=self.dilation)
 
         output = output.view(bs, self.out_planes, h, w)
         return output
@@ -101,13 +131,23 @@ class DynamicConv(nn.Module):
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     K = 4
-    input = torch.randn(1, 256, 125, 125).to(device)
+    in_planes = 256
+    out_planes = 256
+    groups = 1
+    kernel_size = 3
+    input = torch.randn(1, in_planes, 125, 125).to(device)
     weights = torch.randn(1, K).to(device)
 
-    m = DynamicConv(in_planes=256, out_planes=128
-                    , kernel_size=3, stride=1, padding=1, bias=False, temprature=1, K=K).to(device)
+    m = DynamicConv(in_planes=in_planes, out_planes=out_planes
+                    , kernel_size=kernel_size, stride=1, padding=1, init_weight=True
+                    , temprature=1, K=K).to(device)
+
     out = m(input)
     print(out.size())
 
+    m = AdaDynamicConv(in_planes=in_planes, out_planes=out_planes
+                       , kernel_size=kernel_size, stride=1, padding=1, K=K, init_weight=True).to(device)
+
     out = m(input, weights)
+
     print(out.size())

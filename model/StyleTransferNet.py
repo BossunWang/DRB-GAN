@@ -1,10 +1,9 @@
 import torch
 from torch import nn
 
-from ADIN import ADIN_Dynamic
-from DynamicConv import DynamicConv
+from DynamicConv import AdaDynamicConv
 from SW_LIN_Decoder import SW_LIN_Decoder
-from basic_layer import ConvNormLReLU
+from basic_layer import Conv2dBlock, AdaIN
 
 
 class ContentEncoder(nn.Module):
@@ -15,7 +14,8 @@ class ContentEncoder(nn.Module):
         layers = []
         in_channels = 3
         for v in cfg:
-            layers += [ConvNormLReLU(in_channels, v, kernel_size=3, stride=2)]
+            layers += [Conv2dBlock(in_channels, v, kernel_size=3, stride=2, padding=0
+                                   , pad_type="zero", norm="ln", activation="relu")]
             in_channels = v
 
         self.feature_layer = nn.Sequential(*layers)
@@ -33,10 +33,10 @@ class DynamicResBlock(nn.Module):
         self.use_res_connect = in_ch == out_ch
         bottleneck = gamma_dim
         self.conv_layer = nn.Conv2d(in_ch, bottleneck, kernel_size=3, stride=1, padding=1, bias=False)
-        self.adin_layer = ADIN_Dynamic()
+        self.adin_layer = AdaIN()
         self.relu_layer = nn.ReLU(inplace=True)
-        self.dy_conv_layer = DynamicConv(in_planes=bottleneck, out_planes=out_ch
-                                         , kernel_size=3, stride=1, padding=1, bias=False, temprature=1, K=omega_dim)
+        self.dy_conv_layer = AdaDynamicConv(in_planes=bottleneck, out_planes=out_ch
+                                            , kernel_size=3, stride=1, padding=1, K=omega_dim, init_weight=True)
         self.in_layer = nn.InstanceNorm2d(out_ch)
 
     def forward(self, input, style_gamma_code, style_beta_code, style_omega_code):
@@ -67,7 +67,6 @@ class StyleTransferNetwork(nn.Module):
 
     def forward(self, x, style_gamma_code, style_beta_code, style_omega_code):
         content_feature = self.content_encoder(x)
-        # print(content_feature.size())
 
         res_feature = content_feature
         for i, res_layer in enumerate(self.res_layers):
@@ -85,14 +84,15 @@ if __name__ == '__main__':
     gamma_dim = 256
     beta_dim = 256
     omega_dim = 4
-    db_number = 4
+    K = 4
+    db_number = K
     ws = 64
     style_transfer_net \
         = StyleTransferNetwork(encoder_out_ch, gamma_dim, beta_dim, omega_dim, db_number, ws).to(device)
 
     content_input = torch.rand(1, 3, 256, 256).to(device)
-    style_gamma = torch.rand(1, gamma_dim, 1, 1).to(device)
-    style_beta = torch.rand(1, beta_dim, 1, 1).to(device)
+    style_gamma = torch.rand(1, gamma_dim).to(device)
+    style_beta = torch.rand(1, beta_dim).to(device)
     style_omega = torch.rand(1, omega_dim).to(device)
     output = style_transfer_net(content_input, style_gamma, style_beta, style_omega)
     print(output.size())
