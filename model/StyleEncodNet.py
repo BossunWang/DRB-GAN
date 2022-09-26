@@ -71,7 +71,7 @@ class StyleEncodingNetwork(nn.Module):
         style_vgg_feature = style_vgg_feature.view(style_vgg_feature.size(0), -1)
         style_feature = style_feature.view(style_feature.size(0), -1)
 
-        style_mixed_feature = torch.cat([style_vgg_feature, style_feature], -1)
+        style_mixed_feature = torch.cat([style_vgg_feature.detach(), style_feature], -1)
         # print(style_mixed_feature.size())
 
         style_prob = self.ac_classifier(style_mixed_feature)
