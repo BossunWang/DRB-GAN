@@ -82,7 +82,7 @@ class Discriminator(nn.Module):
 
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    M = 2
+    M = 0
     discriminator = Discriminator(M + 1).to(device)
     content_input = torch.rand(1, 3, 256, 256).to(device)
     style_collection_inputs = torch.rand(1, 3 * M, 256, 256).to(device)
