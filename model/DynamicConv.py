@@ -114,7 +114,7 @@ class AdaDynamicConv(nn.Module):
 
     def forward(self, x, att_weights):
         bs, in_planels, h, w = x.shape
-        softmax_att = F.softmax(att_weights)
+        softmax_att = F.softmax(att_weights, dim=-1)
 
         x = x.view(1, -1, h, w)
         weights = self.weight.view(self.K, -1)  # K,-1
