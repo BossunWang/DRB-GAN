@@ -93,19 +93,19 @@ if __name__ == '__main__':
                        , T.Resize(input_size, InterpolationMode.BICUBIC)
                        , T.RandomCrop(crop_size)
                        , T.ToTensor()
-                       , T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))]
+                       , T.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))]
     train_transform = T.Compose(train_transform)
     test_transform = [T.Resize(input_size, InterpolationMode.BICUBIC)
                       , T.ToTensor()
-                      , T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))]
+                      , T.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))]
     test_transform = T.Compose(test_transform)
 
-    train_data_src = ImageDataset('../../photo2fourcollection-20210312T150938Z-001/photo2fourcollection/trainA'
+    train_data_src = ImageDataset('../../Filtered_Places365/train'
                                   , train_transform)
-    train_data_tgt = ImageClassDataset('../../photo2fourcollection-20210312T150938Z-001/photo2fourcollection/trainB'
+    train_data_tgt = ImageClassDataset('../../data_art_backup'
                                        , train_transform
                                        , sample_isze)
-    test_data_tgt = ImageDataset('../../photo2fourcollection-20210312T150938Z-001/photo2fourcollection/testA'
+    test_data_tgt = ImageDataset('../../Filtered_Places365/val/normal'
                                  , test_transform)
 
     batch_size = 1
@@ -124,8 +124,8 @@ if __name__ == '__main__':
 
     style_batch_iterator = iter(train_loader_tgt)
 
-    mean_array = np.array((0.485, 0.456, 0.406)).reshape(1, 1, -1)
-    std_array = np.array((0.229, 0.224, 0.225)).reshape(1, 1, -1)
+    mean_array = np.array((0.5, 0.5, 0.5)).reshape(1, 1, -1)
+    std_array = np.array((0.5, 0.5, 0.5)).reshape(1, 1, -1)
 
     # for content_image in tqdm(train_loader_src):
     #     content_image = content_image.to(device)
