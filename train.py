@@ -61,9 +61,9 @@ def train_one_iter(source, targets, target_labels
     if not update_G_only:
         # Update D
         # from true distribution
-        real_prep = discriminator(target, collection_targets, True)
+        real_prep = discriminator(target, collection_targets, False)
         # from fake distribution
-        fake_prep = discriminator(fake_img.detach(), collection_targets, True)
+        fake_prep = discriminator(fake_img.detach(), collection_targets, False)
         adv_loss_d = criterion.compute_loss_D(fake_prep, real_prep)
         d_loss = adv_loss_d
         # backward
@@ -74,7 +74,7 @@ def train_one_iter(source, targets, target_labels
         discriminator_loss_meter.update(adv_loss_d.item(), batch_size)
 
     # Update G
-    fake_prep = discriminator(fake_img, collection_targets, True)
+    fake_prep = discriminator(fake_img, collection_targets, False)
     adv_loss_g, per_loss, style_cls_loss, content_loss, style_loss \
         = criterion.compute_loss_G(fake_img, source, target, fake_prep, style_prob, target_label.unsqueeze(0))
     g_loss = adv_loss_g + per_loss + style_cls_loss
@@ -130,7 +130,7 @@ def train_one_iter(source, targets, target_labels
         per_loss_meter.reset()
         style_cls_loss_meter.reset()
 
-    if it + 1 % conf.save_freq == 0 or it == conf.iter - 1:
+    if it % conf.save_freq == 0 or it == conf.iter - 1:
         saved_name = 'DRBGAN_it_%d.pt' % it
         state = {
             'iter': it
@@ -154,10 +154,11 @@ def test(source, targets, style_encoder, generator, cur_it, label_dict, mean, st
             fake_img = generator(source, style_gamma, style_beta, style_omega)
 
         result = torch.cat((source[0], fake_img[0]), 2).detach().cpu().numpy().transpose(1, 2, 0)
-        path = os.path.join(conf.sample_dir,
-                            str(cur_it) + '_iter_' + 'test_style_' + label_dict[ti] + '.png')
+        result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
         result = (result * std) + mean
         result = np.clip(result * 255.0, 0, 255)
+        path = os.path.join(conf.sample_dir,
+                            str(cur_it) + '_iter_' + 'test_style_' + label_dict[ti] + '.png')
         cv2.imwrite(path, result)
 
 
@@ -167,24 +168,9 @@ def train(conf):
     init_seeds(3)
     conf.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # model setting
-    VGG = Vgg19().to(conf.device)
-    VGG.eval()
-    style_encoding_net = StyleEncodingNetwork(conf.feature_dim
-                                              , conf.num_classes
-                                              , VGG
-                                              , conf.gamma_dim
-                                              , conf.beta_dim
-                                              , conf.omega_dim).to(conf.device)
-    style_transfer_net = StyleTransferNetwork(conf.encoder_out_ch
-                                              , conf.gamma_dim
-                                              , conf.beta_dim
-                                              , conf.omega_dim
-                                              , conf.db_number, conf.ws).to(conf.device)
-    discriminator = Discriminator(conf.M + 1).to(conf.device)
-
-    mean = (0.485, 0.456, 0.406)
-    std = (0.229, 0.224, 0.225)
+    # data setting
+    mean = (0.5, 0.5, 0.5)
+    std = (0.5, 0.5, 0.5)
 
     mean_array = np.array(mean).reshape(1, 1, -1)
     std_array = np.array(std).reshape(1, 1, -1)
@@ -237,6 +223,26 @@ def train(conf):
 
     source_test_batch_iterator = iter(test_loader_src)
     target_test_batch_iterator = iter(test_loader_tgt)
+
+    num_classes = len(train_data_tgt)
+
+    logger.info('num_classes: %d', num_classes)
+
+    # model setting
+    VGG = Vgg19().to(conf.device)
+    VGG.eval()
+    style_encoding_net = StyleEncodingNetwork(conf.feature_dim
+                                              , num_classes
+                                              , VGG
+                                              , conf.gamma_dim
+                                              , conf.beta_dim
+                                              , conf.omega_dim).to(conf.device)
+    style_transfer_net = StyleTransferNetwork(conf.encoder_out_ch
+                                              , conf.gamma_dim
+                                              , conf.beta_dim
+                                              , conf.omega_dim
+                                              , conf.db_number, conf.ws).to(conf.device)
+    discriminator = Discriminator(conf.M + 1).to(conf.device)
 
     # optimizer setting
     generator_group_dict = [
@@ -327,11 +333,11 @@ def train(conf):
             style_all_cls_images = torch.tensor(
                 [], dtype=torch.float, device=conf.device
             )
-            for ni in range(conf.num_classes):
+            for ni in range(num_classes):
                 try:
                     style_images, style_labels = next(target_test_batch_iterator)
                 except StopIteration:
-                    target_test_batch_iterator = iter(train_loader_tgt)
+                    target_test_batch_iterator = iter(test_loader_tgt)
                     style_images, style_labels = next(target_test_batch_iterator)
 
                 style_images = style_images.to(conf.device)
@@ -364,7 +370,6 @@ if __name__ == '__main__':
     parser.add_argument('--g_lr', type=float, default=2e-5, help='The learning rate')
     parser.add_argument('--d_lr', type=float, default=2e-5, help='The learning rate')
     parser.add_argument('--feature_dim', type=int, default=156160, help='The dimension of style encoder feature')
-    parser.add_argument('--num_classes', type=int, default=4, help='The class number of style')
     parser.add_argument('--gamma_dim', type=int, default=256, help='The dimension of style code for ADIN mean')
     parser.add_argument('--beta_dim', type=int, default=256, help='The dimension of style code for ADIN std')
     parser.add_argument('--omega_dim', type=int, default=4, help='The dimension of style code for DConv')

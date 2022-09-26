@@ -1,7 +1,7 @@
 mkdir 'log_DRB_GAN'
 CUDA_VISIBLE_DEVICES=0 python train.py \
-    --src_dataset "../photo2fourcollection-20210312T150938Z-001/photo2fourcollection/trainA" \
-    --tgt_dataset "../photo2fourcollection-20210312T150938Z-001/photo2fourcollection/trainB" \
+    --src_dataset "../Photo_image_training_data" \
+    --tgt_dataset "../data_art_backup" \
     --test_dataset "../photo2fourcollection-20210312T150938Z-001/photo2fourcollection/testA" \
     --iter 600000 \
     --batch_size 1 \
@@ -9,12 +9,11 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --img_size 256 \
     --crop_size 256 \
     --workers 1 \
-    --print_freq 1000 \
-    --save_freq 50000 \
+    --print_freq 5000 \
+    --save_freq 100000 \
     --g_lr 0.0001 \
-    --g_lr 0.0001 \
+    --d_lr 0.0001 \
     --feature_dim 156160 \
-    --num_classes 4 \
     --gamma_dim 256 \
     --beta_dim 256 \
     --omega_dim 4 \
@@ -22,13 +21,13 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --db_number 4 \
     --ws 64 \
     --M 2 \
-    --g_adv_weight 1.0 \
-    --d_adv_weight 1.0 \
+    --g_adv_weight 1.5 \
+    --d_adv_weight 1.5 \
     --con_weight 1.0 \
-    --sty_weight 0.02 \
+    --sty_weight 0.05 \
     --perceptual_weight 1. \
-    --class_weight 10. \
-    --gan_loss "lsgan" \
+    --class_weight 1. \
+    --gan_loss "nsgan" \
     --checkpoint_dir "checkpoint_DRB_GAN" \
     --log_dir "log_DRB_GAN" \
     --sample_dir "samples_DRB_GAN" \
