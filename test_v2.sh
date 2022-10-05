@@ -1,0 +1,19 @@
+CUDA_VISIBLE_DEVICES=0 python test.py \
+    --test_dataset "../../cat_images" \
+    --tgt_dataset "../wiki_art_test" \
+    --tgt_img_size 512 \
+    --tgt_crop_size 512 \
+    --workers 1 \
+    --feature_dim 639488 \
+    --gamma_dim 200 \
+    --beta_dim 200 \
+    --omega_dim 4 \
+    --encoder_out_ch 128 \
+    --db_number 4 \
+    --ws 128 \
+    --M 2 \
+    --sample_dir "train_log_v2/stylized_cat_images" \
+    --pretrain_model "train_log_v2/checkpoint_DRB_GAN_animal/DRBGAN_it_599999.pt" \
+    --mixture_list "LOUIS WAIN" "Ukiyo_e" \
+    --mixture_weights 0.5 0.5 \
+    --sample_compared

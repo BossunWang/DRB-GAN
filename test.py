@@ -7,6 +7,7 @@ import cv2
 import torch
 from torchvision import transforms as T
 from torchvision.transforms import InterpolationMode
+from torch.nn import functional as F
 
 abs_path = os.getcwd().split('DRB-GAN')[0]
 sys.path.append(os.path.join(abs_path, 'DRB-GAN', "model"))
@@ -29,7 +30,11 @@ def test(source, targets, style_encoder, generator, cur_it, label_dict, mean, st
             style_prob, style_gamma, style_beta, style_omega = style_encoder(target.unsqueeze(0), style_label)
             fake_img = generator(source, style_gamma, style_beta, style_omega)
 
-        result = torch.cat((source[0], fake_img[0]), 2).detach().cpu().numpy().transpose(1, 2, 0)
+        if conf.sample_compared:
+            source = F.interpolate(source, [fake_img.size(2), fake_img.size(3)], mode='bilinear')
+            result = torch.cat((source[0], fake_img[0]), 2).detach().cpu().numpy().transpose(1, 2, 0)
+        else:
+            result = fake_img[0].detach().cpu().numpy().transpose(1, 2, 0)
         result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
         result = (result * std) + mean
         result = np.clip(result * 255.0, 0, 255)
@@ -46,7 +51,11 @@ def test(source, targets, style_encoder, generator, cur_it, label_dict, mean, st
 
     # style mixed
     mixture_img = generator(source, style_mix_gamma, style_mix_beta, style_mix_omega)
-    mixture_result = torch.cat((source[0], mixture_img[0]), 2).detach().cpu().numpy().transpose(1, 2, 0)
+    if conf.sample_compared:
+        source = F.interpolate(source, [mixture_img.size(2), mixture_img.size(3)], mode='bilinear')
+        mixture_result = torch.cat((source[0], mixture_img[0]), 2).detach().cpu().numpy().transpose(1, 2, 0)
+    else:
+        mixture_result = mixture_img[0].detach().cpu().numpy().transpose(1, 2, 0)
     mixture_result = cv2.cvtColor(mixture_result, cv2.COLOR_BGR2RGB)
     mixture_result = (mixture_result * std) + mean
     mixture_result = np.clip(mixture_result * 255.0, 0, 255)
@@ -178,6 +187,7 @@ if __name__ == '__main__':
                         help='file name to load the model for training')
     parser.add_argument('--mixture_list', type=str, nargs='+')
     parser.add_argument('--mixture_weights', type=float, nargs='+')
+    parser.add_argument('--sample_compared', action='store_true', default=False)
     args = parser.parse_args()
 
     assert len(args.mixture_list) == len(args.mixture_weights), "mixture_list and mixture_weights should be same size"

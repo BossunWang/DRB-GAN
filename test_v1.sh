@@ -13,6 +13,6 @@ CUDA_VISIBLE_DEVICES=0 python test.py \
     --ws 64 \
     --M 2 \
     --sample_dir "results_DRB_GAN" \
-    --pretrain_model "train_log/checkpoint_DRB_GAN/DRBGAN_it_500000.pt" \
+    --pretrain_model "train_log_v1/checkpoint_DRB_GAN/DRBGAN_it_500000.pt" \
     --mixture_list "paul-cezanne" "monet" \
     --mixture_weights 0.5 0.5
