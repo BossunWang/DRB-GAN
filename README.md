@@ -37,7 +37,9 @@ https://openaccess.thecvf.com/content/ICCV2021/papers/Xu_DRB-GAN_A_Dynamic_ResBl
 * LPIPS: Reference-guided LPIPS values for each style with content: 0.5225579113960266
 * FID between style and stylized: 49.61556248811253
 * SIFID between style and stylized: 0.00016049967
+* IS for stylized: 6.173467775877308
 ### Photo Scene(another domain)
 * Reference-guided LPIPS values for all style: 0.4380792519592103
 * FID between style and stylized: 127.29334051784087
 * SIFID between style and stylized: 0.08613132
+* IS for stylized: 5.70985832650343
