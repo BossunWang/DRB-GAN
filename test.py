@@ -19,6 +19,13 @@ from model.DiscriminativeNet import Discriminator
 from model.vgg_nets import Vgg19
 
 
+def save_image(image, mean, std, save_path):
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = (image * std) + mean
+    image = np.clip(image * 255.0, 0, 255)
+    cv2.imwrite(save_path, image)
+
+
 def test(source, targets, style_encoder, generator, cur_it, label_dict, mean, std, conf):
     style_mix_gamma = torch.zeros((1, conf.gamma_dim)).to(conf.device)
     style_mix_beta = torch.zeros((1, conf.beta_dim)).to(conf.device)
@@ -35,12 +42,13 @@ def test(source, targets, style_encoder, generator, cur_it, label_dict, mean, st
             result = torch.cat((source[0], fake_img[0]), 2).detach().cpu().numpy().transpose(1, 2, 0)
         else:
             result = fake_img[0].detach().cpu().numpy().transpose(1, 2, 0)
-        result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
-        result = (result * std) + mean
-        result = np.clip(result * 255.0, 0, 255)
-        path = os.path.join(conf.sample_dir,
-                            str(cur_it) + '_test_style_' + label_dict[ti] + '.png')
-        cv2.imwrite(path, result)
+
+        path = os.path.join(conf.sample_dir, label_dict[ti], str(cur_it) + conf.save_extend)
+        save_image(result, mean, std, path)
+
+        if conf.ref_style_dir is not None:
+            ref_img_path = os.path.join(conf.ref_style_dir, label_dict[ti], str(cur_it) + conf.save_extend)
+            save_image(target.detach().cpu().numpy().transpose(1, 2, 0), mean, std, ref_img_path)
 
         # collect style mixture code
         if label_dict[ti] in conf.mixture_list:
@@ -50,18 +58,19 @@ def test(source, targets, style_encoder, generator, cur_it, label_dict, mean, st
             style_mix_omega += conf.mixture_weights[li] * style_omega
 
     # style mixed
-    mixture_img = generator(source, style_mix_gamma, style_mix_beta, style_mix_omega)
-    if conf.sample_compared:
-        source = F.interpolate(source, [mixture_img.size(2), mixture_img.size(3)], mode='bilinear')
-        mixture_result = torch.cat((source[0], mixture_img[0]), 2).detach().cpu().numpy().transpose(1, 2, 0)
-    else:
-        mixture_result = mixture_img[0].detach().cpu().numpy().transpose(1, 2, 0)
-    mixture_result = cv2.cvtColor(mixture_result, cv2.COLOR_BGR2RGB)
-    mixture_result = (mixture_result * std) + mean
-    mixture_result = np.clip(mixture_result * 255.0, 0, 255)
-    path = os.path.join(conf.sample_dir,
-                        str(cur_it) + '_mix_style_' + '_'.join(conf.mixture_list) + '.png')
-    cv2.imwrite(path, mixture_result)
+    if len(conf.mixture_list) > 0:
+        mixture_img = generator(source, style_mix_gamma, style_mix_beta, style_mix_omega)
+        if conf.sample_compared:
+            source = F.interpolate(source, [mixture_img.size(2), mixture_img.size(3)], mode='bilinear')
+            mixture_result = torch.cat((source[0], mixture_img[0]), 2).detach().cpu().numpy().transpose(1, 2, 0)
+        else:
+            mixture_result = mixture_img[0].detach().cpu().numpy().transpose(1, 2, 0)
+        mixture_result = cv2.cvtColor(mixture_result, cv2.COLOR_BGR2RGB)
+        mixture_result = (mixture_result * std) + mean
+        mixture_result = np.clip(mixture_result * 255.0, 0, 255)
+        path = os.path.join(conf.sample_dir
+                            , '_'.join(conf.mixture_list), str(cur_it) + conf.save_extend)
+        cv2.imwrite(path, mixture_result)
 
 
 def main(conf):
@@ -88,6 +97,24 @@ def main(conf):
     train_data_tgt = ImageClassDataset(conf.tgt_dataset, train_transform, sample_size=1)
     test_data_src = ImageDataset(conf.test_dataset, test_transform)
     label_dict = train_data_tgt.label_dict
+
+    # create folders
+    for label_str in label_dict:
+        dir_path = os.path.join(args.sample_dir, label_str)
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+
+        if conf.ref_style_dir is not None:
+            ref_dir_path = os.path.join(args.ref_style_dir, label_str)
+            if not os.path.exists(ref_dir_path):
+                os.makedirs(ref_dir_path)
+
+    if conf.stored_content_dir is not None:
+        if not os.path.exists(conf.stored_content_dir):
+            os.makedirs(os.path.join(conf.stored_content_dir))
+
+    if not os.path.exists(os.path.join(args.sample_dir, '_'.join(conf.mixture_list))):
+        os.makedirs(os.path.join(args.sample_dir, '_'.join(conf.mixture_list)))
 
     test_loader_src = torch.utils.data.DataLoader(test_data_src
                                                   , batch_size=1
@@ -160,9 +187,13 @@ def main(conf):
              , style_encoding_net, style_transfer_net
              , it, label_dict, mean_array, std_array, conf)
 
+        if conf.stored_content_dir is not None:
+            path = os.path.join(conf.stored_content_dir, str(it) + conf.save_extend)
+            save_image(content_image[0].detach().cpu().numpy().transpose(1, 2, 0), mean, std, path)
+
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='DRB-GAN tes')
+    parser = argparse.ArgumentParser(description='DRB-GAN test')
     parser.add_argument('--tgt_dataset', type=str, default='', help='target dataset path')
     parser.add_argument('--test_dataset', type=str, default='', help='test dataset path')
 
@@ -181,6 +212,12 @@ if __name__ == '__main__':
 
     parser.add_argument('--sample_dir', type=str, default='samples',
                         help='Directory name to save the samples on training')
+    parser.add_argument('--ref_style_dir', type=str, default=None,
+                        help='Directory name to save the reference on training')
+    parser.add_argument('--stored_content_dir', type=str, default=None,
+                        help='Directory name to save the reference on training')
+    parser.add_argument('--save_extend', type=str, default=".png",
+                        help='Directory name to save the reference on training')
     parser.add_argument('--vgg_model', type=str, default='vgg19-dcbb9e9d.pth',
                         help='file name to load the vgg model for feature extraction')
     parser.add_argument('--pretrain_model', type=str, default='checkpoint/',

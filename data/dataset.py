@@ -17,7 +17,7 @@ def make_dataset(dir):
     assert os.path.isdir(dir), '%s is not a valid directory' % dir
 
     for dirPath, dirNames, fileNames in os.walk(dir):
-        for f in fileNames:
+        for f in sorted(fileNames):
             path = os.path.join(dirPath, f)
             if "jpg" in Path(path).suffix or "png" in Path(path).suffix:
                 images.append(path)
