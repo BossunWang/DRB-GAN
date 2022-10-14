@@ -26,11 +26,12 @@ def make_dataset(dir):
 
 
 class ImageDataset(Dataset):
-    def __init__(self, data_root, transform):
+    def __init__(self, data_root, transform, get_path=False):
         self.data_root = data_root
         self.train_list = []
         self.files = make_dataset(self.data_root)
         self.transform = transform
+        self.get_path = get_path
 
     def __len__(self):
         return len(self.files)
@@ -43,7 +44,11 @@ class ImageDataset(Dataset):
     def __getitem__(self, index):
         image_path = self.files[index]
         image = self.to_Tensor(image_path)
-        return image
+
+        if self.get_path:
+            return image, image_path
+        else:
+            return image
 
 
 class ImageClassDataset(Dataset):

@@ -43,3 +43,6 @@ https://openaccess.thecvf.com/content/ICCV2021/papers/Xu_DRB-GAN_A_Dynamic_ResBl
 * FID between style and stylized: 127.29334051784087
 * SIFID between style and stylized: 0.08613132
 * IS for stylized: 5.70985832650343
+### Style classification
+* class accuracy: 0.9672864203341963
+* error rate about nicholas is highest: 66/858 = 0.0769
