@@ -22,7 +22,7 @@ https://openaccess.thecvf.com/content/ICCV2021/papers/Xu_DRB-GAN_A_Dynamic_ResBl
   * https://github.com/BossunWang/DRB-GAN/blob/642beae6e9a1437b77d3aa70d39870a7b2e87cfd/model/DiscriminativeNet.py#L32
 
 ## To Do List
-- [ ] Explore data analysis using v2 model: cluster of style features, style classifer predicted labels difference from true label
+- [X] Explore data analysis using v2 model: cluster of style features, style classifer predicted labels difference from true label
 - [ ] Traning with fp16
 - [ ] Observered How to converge
 - [ ] Rolling Guidance Filter, Guided Filter, Gabor Filter
@@ -46,3 +46,9 @@ https://openaccess.thecvf.com/content/ICCV2021/papers/Xu_DRB-GAN_A_Dynamic_ResBl
 ### Style classification
 * class accuracy: 0.9672864203341963
 * error rate about nicholas is highest: 66/858 = 0.0769
+
+## UMAP and TSNE
+### UMAP for style codes
+![umap](analysis/style_cluster_v2/style_feature_UMAP.jpg)
+### TSNE for style codes
+![tsne](analysis/style_cluster_v2/style_feature_tsne.jpg)
