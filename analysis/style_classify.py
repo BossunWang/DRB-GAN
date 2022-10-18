@@ -45,10 +45,16 @@ def main(conf):
     if not os.path.exists(conf.incorrect_dir):
         os.makedirs(conf.incorrect_dir)
 
+    if not os.path.exists(conf.correct_dir):
+        os.makedirs(conf.correct_dir)
+
     for label_str in label_dict:
-        dir_path = os.path.join(conf.incorrect_dir, label_str)
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
+        incorrect_dir_path = os.path.join(conf.incorrect_dir, label_str)
+        correct_dir_path = os.path.join(conf.correct_dir, label_str)
+        if not os.path.exists(incorrect_dir_path):
+            os.makedirs(incorrect_dir_path)
+        if not os.path.exists(correct_dir_path):
+            os.makedirs(correct_dir_path)
 
     test_loader_tgt = torch.utils.data.DataLoader(test_data_tgt
                                                   , batch_size=1
@@ -97,15 +103,18 @@ def main(conf):
             style_label = torch.Tensor([style_label]).long().to(conf.device)
             style_images = style_images.to(conf.device)
             style_prob, style_gamma, style_beta, style_omega = style_encoding_net(style_images, style_label)
-            # saved incorrect images
-            if style_prob.argmax() != style_label:
-                incorrect_img_path = style_img_path.replace(conf.tgt_dataset, conf.incorrect_dir)
-                incorrect_extend_name \
-                    = "_" + label_dict[style_label] + "_to_" + label_dict[style_prob.argmax()] + ".jpg"
-                incorrect_img_path = incorrect_img_path.replace(".jpg", incorrect_extend_name)
-                shutil.copyfile(style_img_path, incorrect_img_path)
-            else:
-                correct_count += 1
+        # saved incorrect images
+        if style_prob.argmax() != style_label:
+            incorrect_img_path = style_img_path.replace(conf.tgt_dataset, conf.incorrect_dir)
+            incorrect_extend_name \
+                = "_" + label_dict[style_label] + "_to_" + label_dict[style_prob.argmax()] + ".jpg"
+            incorrect_img_path = incorrect_img_path.replace(".jpg", incorrect_extend_name)
+            shutil.copyfile(style_img_path, incorrect_img_path)
+        # saved correct images
+        else:
+            correct_img_path = style_img_path.replace(conf.tgt_dataset, conf.correct_dir)
+            shutil.copyfile(style_img_path, correct_img_path)
+            correct_count += 1
 
     print("class accuracy:", correct_count / data_size)
 
@@ -132,6 +141,8 @@ if __name__ == '__main__':
     parser.add_argument('--pretrain_model', type=str, default='checkpoint/',
                         help='file name to load the model for training')
     parser.add_argument('--incorrect_dir', type=str, default='incorrect',
+                        help='Directory name to save the incorrect style prediction images')
+    parser.add_argument('--correct_dir', type=str, default='correct',
                         help='Directory name to save the incorrect style prediction images')
     args = parser.parse_args()
 

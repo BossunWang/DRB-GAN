@@ -12,6 +12,7 @@ CUDA_VISIBLE_DEVICES=0 python style_classify.py \
     --ws 128 \
     --M 2 \
     --pretrain_model "../train_log_v2/checkpoint_DRB_GAN_animal/DRBGAN_it_599999.pt" \
-    --incorrect_dir "incorrect_style_prediction_v2"
+    --incorrect_dir "incorrect_style_prediction_v2" \
+    --correct_dir "../../art_dataset_v2"
 
 
