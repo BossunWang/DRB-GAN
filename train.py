@@ -40,7 +40,7 @@ def set_logging(rank=-1):
 
 def train_one_iter(source, targets, target_labels
                    , style_encoder, generator, discriminator
-                   , criterion, G_optimizer, D_optimizer
+                   , criterion, G_optimizer, D_optimizer, scaler
                    , discriminator_loss_meter, generator_loss_meter
                    , content_loss_meter, style_loss_meter, per_loss_meter, style_cls_loss_meter
                    , it, conf, update_G_only=False):
@@ -54,34 +54,54 @@ def train_one_iter(source, targets, target_labels
     target_label = target_labels[0][0]
 
     # generate fake image
-    style_prob, style_gamma, style_beta, style_omega = style_encoder(target, target_label.unsqueeze(0))
-    fake_img = generator(source, style_gamma, style_beta, style_omega)
+    with torch.cuda.amp.autocast(enabled=conf.mixed_precision):
+        style_prob, style_gamma, style_beta, style_omega = style_encoder(target, target_label.unsqueeze(0))
+        fake_img = generator(source, style_gamma, style_beta, style_omega)
 
     # training rate: G : D = self.training_rate : 1
     if not update_G_only:
         # Update D
-        # from true distribution
-        real_prep = discriminator(target, collection_targets, False)
-        # from fake distribution
-        fake_prep = discriminator(fake_img.detach(), collection_targets, False)
-        adv_loss_d = criterion.compute_loss_D(fake_prep, real_prep)
-        d_loss = adv_loss_d
+        with torch.cuda.amp.autocast(enabled=conf.mixed_precision):
+            # from true distribution
+            real_prep = discriminator(target, collection_targets, False)
+            # from fake distribution
+            fake_prep = discriminator(fake_img.detach(), collection_targets, False)
+            adv_loss_d = criterion.compute_loss_D(fake_prep, real_prep)
+            d_loss = adv_loss_d
         # backward
         D_optimizer.zero_grad()
-        d_loss.backward()
-        D_optimizer.step()
+        if conf.mixed_precision:
+            scaler.scale(d_loss).backward()
+            scaler.step(D_optimizer)
+            scaler.update()
+        else:
+            d_loss.backward()
+            D_optimizer.step()
 
         discriminator_loss_meter.update(adv_loss_d.item(), batch_size)
 
     # Update G
-    fake_prep = discriminator(fake_img, collection_targets, False)
-    adv_loss_g, per_loss, style_cls_loss, content_loss, style_loss \
-        = criterion.compute_loss_G(fake_img, source, target, fake_prep, style_prob, target_label.unsqueeze(0))
-    g_loss = adv_loss_g + per_loss + style_cls_loss
+    with torch.cuda.amp.autocast(enabled=conf.mixed_precision):
+        fake_prep = discriminator(fake_img, collection_targets, False)
+        adv_loss_g, per_loss, style_cls_loss, content_loss, style_loss \
+            = criterion.compute_loss_G(fake_img
+                                       , source
+                                       , target
+                                       , fake_prep
+                                       , style_prob
+                                       , target_label.unsqueeze(0)
+                                       , mixed_precision=conf.mixed_precision)
+        g_loss = adv_loss_g + per_loss + style_cls_loss
 
+    # backward
     G_optimizer.zero_grad()
-    g_loss.backward()
-    G_optimizer.step()
+    if conf.mixed_precision:
+        scaler.scale(g_loss).backward()
+        scaler.step(G_optimizer)
+        scaler.update()
+    else:
+        g_loss.backward()
+        G_optimizer.step()
 
     generator_loss_meter.update(adv_loss_g.item(), batch_size)
     content_loss_meter.update(content_loss.item(), batch_size)
@@ -254,6 +274,7 @@ def train(conf):
 
     # loss setting
     criterion = DRBGANLoss(conf, VGG)
+    scaler = torch.cuda.amp.GradScaler(enabled=conf.mixed_precision)
 
     ori_iter = 0
 
@@ -309,7 +330,7 @@ def train(conf):
 
         train_one_iter(content_image, style_images, style_labels
                        , style_encoder, generator, discriminator
-                       , criterion, G_optimizer, D_optimizer
+                       , criterion, G_optimizer, D_optimizer, scaler
                        , discriminator_loss_meter, generator_loss_meter
                        , content_loss_meter, style_loss_meter, per_loss_meter, style_cls_loss_meter
                        , it, conf, update_G_only)
@@ -400,6 +421,7 @@ if __name__ == '__main__':
                         help='whether to pretrained')
     parser.add_argument('--pretrain_model', type=str, default='checkpoint/',
                         help='file name to load the model for training')
+    parser.add_argument('--mixed_precision', action='store_true', default=False)
     args = parser.parse_args()
 
     if not os.path.exists(args.checkpoint_dir):
