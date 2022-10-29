@@ -14,8 +14,8 @@ class ContentEncoder(nn.Module):
         layers = []
         in_channels = 3
         for v in cfg:
-            layers += [Conv2dBlock(in_channels, v, kernel_size=3, stride=2, padding=0
-                                   , pad_type="zero", norm="ln", activation="relu")]
+            layers += [Conv2dBlock(in_channels, v, kernel_size=3, stride=2, padding=1
+                                   , pad_type="reflect", norm="ln", activation="relu")]
             in_channels = v
 
         self.feature_layer = nn.Sequential(*layers)
@@ -32,7 +32,8 @@ class DynamicResBlock(nn.Module):
         assert gamma_dim == beta_dim
         self.use_res_connect = in_ch == out_ch
         bottleneck = gamma_dim
-        self.conv_layer = nn.Conv2d(in_ch, bottleneck, kernel_size=3, stride=1, padding=1, bias=False)
+        self.padd_layer = nn.ReflectionPad2d(1)
+        self.conv_layer = nn.Conv2d(in_ch, bottleneck, kernel_size=3, stride=1, padding=0, bias=False)
         self.adin_layer = AdaIN()
         self.relu_layer = nn.ReLU(inplace=True)
         self.dy_conv_layer = AdaDynamicConv(in_planes=bottleneck, out_planes=out_ch
@@ -40,7 +41,8 @@ class DynamicResBlock(nn.Module):
         self.in_layer = nn.InstanceNorm2d(out_ch)
 
     def forward(self, input, style_gamma_code, style_beta_code, style_omega_code):
-        out = self.conv_layer(input)
+        out = self.padd_layer(input)
+        out = self.conv_layer(out)
         out = self.adin_layer(out, style_gamma_code, style_beta_code)
         out = self.relu_layer(out)
         out = self.dy_conv_layer(out, style_omega_code)
@@ -81,8 +83,8 @@ if __name__ == '__main__':
 
     num_classes = 4
     encoder_out_ch = 128
-    gamma_dim = 256
-    beta_dim = 256
+    gamma_dim = 128
+    beta_dim = 128
     omega_dim = 4
     K = 4
     db_number = K
@@ -90,7 +92,7 @@ if __name__ == '__main__':
     style_transfer_net \
         = StyleTransferNetwork(encoder_out_ch, gamma_dim, beta_dim, omega_dim, db_number, ws).to(device)
 
-    content_input = torch.rand(1, 3, 256, 256).to(device)
+    content_input = torch.rand(1, 3, 512, 512).to(device)
     style_gamma = torch.rand(1, gamma_dim).to(device)
     style_beta = torch.rand(1, beta_dim).to(device)
     style_omega = torch.rand(1, omega_dim).to(device)

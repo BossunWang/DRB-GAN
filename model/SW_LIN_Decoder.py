@@ -12,16 +12,14 @@ class SW_LIN_Decoder(nn.Module):
         ws_group = [ws, ws * 2]
         layers = []
         for i, (v, ws) in enumerate(zip(cfg, ws_group)):
-            if i == len(cfg) - 1:
-                conv2d = nn.Conv2d(in_channels, v, kernel_size=7, stride=1, padding=3)
-            else:
-                conv2d = nn.Conv2d(in_channels, v, kernel_size=3, stride=1, padding=2)
-            layers += [nn.Sequential(conv2d, SW_LIN(v, ws), nn.ReLU(inplace=True))]
+            conv2d = nn.Conv2d(in_channels, v, kernel_size=3, stride=1, padding=0)
+            layers += [nn.Sequential(nn.ReflectionPad2d(1), conv2d, SW_LIN(v, ws), nn.ReLU(inplace=True))]
             in_channels = v
 
         self.decode_layer = nn.ModuleList(layers)
         self.out_layer = nn.Sequential(
-            nn.Conv2d(cfg[-1], 3, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.ReflectionPad2d(1),
+            nn.Conv2d(cfg[-1], 3, kernel_size=3, stride=1, padding=0, bias=False),
             nn.Tanh()
         )
 
@@ -42,7 +40,7 @@ if __name__ == '__main__':
     ws = 64
     sw_in = SW_LIN(normalized_shape, ws).to(device)
 
-    content_feature = torch.rand(1, normalized_shape, 63, 63).to(device)
+    content_feature = torch.rand(1, normalized_shape, 128, 128).to(device)
     content_normal = sw_in(content_feature)
     print(content_normal.size())
 

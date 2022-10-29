@@ -12,8 +12,8 @@ class StyleEncoder(nn.Module):
         layers = []
         in_channels = 3
         for v in cfg:
-            layers += [Conv2dBlock(in_channels, v, kernel_size=3, stride=2, padding=0
-                                   , pad_type="zero", norm="ln", activation="relu")]
+            layers += [Conv2dBlock(in_channels, v, kernel_size=3, stride=2, padding=1
+                                   , pad_type="reflect", norm="ln", activation="relu")]
             in_channels = v
 
         self.feature_layer = nn.Sequential(*layers)
@@ -92,10 +92,10 @@ if __name__ == '__main__':
     VGG = Vgg19().to(device)
     VGG.eval()
 
-    feature_dim = 1 * 512 * 16 * 16 + 1 * 512 * 7 * 7
+    feature_dim = 1 * 512 * 32 * 32 + 1 * 512 * 16 * 16
     num_classes = 4
-    gamma_dim = 256
-    beta_dim = 256
+    gamma_dim = 128
+    beta_dim = 128
     K = 4
     omega_dim = K
     style_label = torch.randint(0, num_classes, (1,)).to(device)
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     style_encoding_net \
         = StyleEncodingNetwork(feature_dim, num_classes, VGG, gamma_dim, beta_dim, omega_dim).to(device)
 
-    style_input = torch.rand(1, 3, 256, 256).to(device)
+    style_input = torch.rand(1, 3, 512, 512).to(device)
     style_prob, style_gamma, style_beta, style_omega = style_encoding_net(style_input, style_label)
     print("style_prob:", style_prob.size())
     print("style_gamma:", style_gamma.size())
