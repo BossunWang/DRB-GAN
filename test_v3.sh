@@ -1,0 +1,21 @@
+CUDA_VISIBLE_DEVICES=0 python test.py \
+    --test_dataset "../Stable_Diffusion_Demo" \
+    --tgt_dataset "../art_dataset_v2" \
+    --tgt_img_size 512 \
+    --tgt_crop_size 512 \
+    --workers 1 \
+    --feature_dim 655360 \
+    --gamma_dim 128 \
+    --beta_dim 128 \
+    --omega_dim 4 \
+    --encoder_out_ch 128 \
+    --db_number 4 \
+    --ws 128 \
+    --M 2 \
+    --sample_dir "train_log_v3/stylized_stable_diffusion_demo_val" \
+    --ref_style_dir "train_log_v3/style_ref_stable_diffusion_demo_val" \
+    --save_extend ".png" \
+    --pretrain_model "train_log_v3/checkpoint_DRB_GAN_animal_style_data_v2/DRBGAN_it_699999.pt" \
+    --mixture_list "LOUIS WAIN" "kaka" \
+    --mixture_weights 0.5 0.5 \
+    --sample_compared

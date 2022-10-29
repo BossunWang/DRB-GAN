@@ -19,7 +19,10 @@ def make_dataset(dir):
     for dirPath, dirNames, fileNames in os.walk(dir):
         for f in sorted(fileNames):
             path = os.path.join(dirPath, f)
-            if "jpg" in Path(path).suffix or "png" in Path(path).suffix or "jpeg" in Path(path).suffix:
+            if "jpg" in Path(path).suffix \
+                    or "png" in Path(path).suffix \
+                    or "jpeg" in Path(path).suffix \
+                    or "jfif" in Path(path).suffix:
                 images.append(path)
 
     return images
