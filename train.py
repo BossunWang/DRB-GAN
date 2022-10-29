@@ -202,13 +202,24 @@ def train(conf):
                        , T.ToTensor()
                        , T.Normalize(mean=mean, std=std)]
     train_transform = T.Compose(train_transform)
+
+    train_assigned_transform = [T.RandomHorizontalFlip()
+                                , T.CenterCrop(conf.crop_size)
+                                , T.ToTensor()
+                                , T.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))]
+    train_assigned_transform = T.Compose(train_assigned_transform)
+
     test_transform = [T.Resize(conf.img_size, InterpolationMode.BICUBIC)
+                      , T.CenterCrop(conf.crop_size)
                       , T.ToTensor()
                       , T.Normalize(mean=mean, std=std)]
     test_transform = T.Compose(test_transform)
 
     train_data_src = ImageDataset(conf.src_dataset, train_transform)
-    train_data_tgt = ImageClassDataset(conf.tgt_dataset, train_transform, sample_size=conf.M + 1)
+    train_data_tgt = ImageClassDataset(conf.tgt_dataset, train_transform
+                                       , sample_size=conf.M + 1
+                                       , assigned_labels=[6] # kaka
+                                       , assigned_transform=[train_assigned_transform])
     test_data_src = ImageDataset(conf.test_dataset, test_transform)
     label_dict = train_data_tgt.label_dict
 
@@ -246,6 +257,7 @@ def train(conf):
 
     num_classes = len(train_data_tgt)
 
+    logger.info('training data size: %d', len(train_loader_src))
     logger.info('num_classes: %d', num_classes)
 
     # model setting
@@ -293,6 +305,7 @@ def train(conf):
             discriminator.load_state_dict(checkpoint['discriminator'])
             G_optimizer.load_state_dict(checkpoint['G_optimizer'])
             D_optimizer.load_state_dict(checkpoint['D_optimizer'])
+        del checkpoint
 
     style_encoder = torch.nn.DataParallel(style_encoding_net)
     generator = torch.nn.DataParallel(style_transfer_net)

@@ -1,9 +1,9 @@
-mkdir 'log_DRB_GAN_HD_fp16'
-CUDA_VISIBLE_DEVICES=0 python train.py \
+mkdir 'log_DRB_GAN_animal_style_data_v2'
+CUDA_VISIBLE_DEVICES=1 python train.py \
     --src_dataset "../../Animal_dataset/train" \
     --tgt_dataset "../art_dataset_v2" \
     --test_dataset "../../Animal_dataset/val" \
-    --iter 600000 \
+    --iter 700000 \
     --batch_size 1 \
     --training_rate 1 \
     --img_size 512 \
@@ -13,9 +13,9 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --save_freq 100000 \
     --g_lr 0.0001 \
     --d_lr 0.0001 \
-    --feature_dim 639488 \
-    --gamma_dim 200 \
-    --beta_dim 200 \
+    --feature_dim 655360 \
+    --gamma_dim 128 \
+    --beta_dim 128 \
     --omega_dim 4 \
     --encoder_out_ch 128 \
     --db_number 4 \
@@ -28,6 +28,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --perceptual_weight 1. \
     --class_weight 1. \
     --gan_loss "nsgan" \
-    --checkpoint_dir "checkpoint_DRB_GAN_HD_fp16" \
-    --log_dir "log_DRB_GAN_HD_fp16" \
-    --sample_dir "samples_DRB_GAN_HD_fp16"
+    --checkpoint_dir "checkpoint_DRB_GAN_animal_style_data_v2" \
+    --log_dir "log_DRB_GAN_animal_style_data_v2" \
+    --sample_dir "samples_DRB_GAN_animal_style_data_v2"
+
