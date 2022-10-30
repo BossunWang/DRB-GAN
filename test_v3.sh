@@ -14,8 +14,10 @@ CUDA_VISIBLE_DEVICES=0 python test.py \
     --M 2 \
     --sample_dir "train_log_v3/stylized_stable_diffusion_demo_val" \
     --ref_style_dir "train_log_v3/style_ref_stable_diffusion_demo_val" \
+    --stored_content_dir "train_log_v3/photo_stable_diffusion_demo_val" \
     --save_extend ".png" \
     --pretrain_model "train_log_v3/checkpoint_DRB_GAN_animal_style_data_v2/DRBGAN_it_699999.pt" \
     --mixture_list "LOUIS WAIN" "kaka" \
     --mixture_weights 0.5 0.5 \
-    --sample_compared
+    --sample_compared \
+    --add_random_noise

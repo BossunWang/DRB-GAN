@@ -29,7 +29,7 @@ def make_dataset(dir):
 
 
 class ImageDataset(Dataset):
-    def __init__(self, data_file, transform, get_path=False):
+    def __init__(self, data_file, transform, get_path=False, random_noise=False):
         if os.path.isdir(data_file):
             self.files = make_dataset(data_file)
         else:
@@ -40,12 +40,21 @@ class ImageDataset(Dataset):
 
         self.transform = transform
         self.get_path = get_path
+        self.random_noise = random_noise
 
     def __len__(self):
         return len(self.files)
 
+    def add_g(self, image_array, mean=0.0, var=30):
+        std = var ** 0.5
+        image_add = image_array + np.random.normal(mean, std, image_array.shape)
+        image_add = np.clip(image_add, 0, 255).astype(np.uint8)
+        return image_add
+
     def to_Tensor(self, image_path):
         image = Image.open(image_path).convert('RGB')
+        if self.random_noise:
+            image = self.add_g(np.array(image), var=200)
         image = self.transform(image)
         return image
 
