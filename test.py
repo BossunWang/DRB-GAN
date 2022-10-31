@@ -90,11 +90,26 @@ def main(conf):
                        , T.Normalize(mean=mean, std=std)]
     train_transform = T.Compose(train_transform)
 
-    test_transform = [T.ToTensor()
-                      , T.Normalize(mean=mean, std=std)]
+    train_assigned_transform = [T.RandomHorizontalFlip()
+                                , T.CenterCrop(conf.tgt_crop_size)
+                                , T.ToTensor()
+                                , T.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))]
+    train_assigned_transform = T.Compose(train_assigned_transform)
+
+    if conf.src_img_size > 0:
+        test_transform = [T.Resize(conf.src_img_size, InterpolationMode.BICUBIC)
+                          , T.ToTensor()
+                          , T.Normalize(mean=mean, std=std)]
+    else:
+        test_transform = [T.ToTensor()
+                          , T.Normalize(mean=mean, std=std)]
     test_transform = T.Compose(test_transform)
 
-    train_data_tgt = ImageClassDataset(conf.tgt_dataset, train_transform, sample_size=1)
+    train_data_tgt = ImageClassDataset(conf.tgt_dataset
+                                       , train_transform
+                                       , sample_size=1
+                                       , assigned_labels=[6] # kaka
+                                       , assigned_transform=[train_assigned_transform])
     test_data_src = ImageDataset(conf.test_dataset, test_transform, random_noise=conf.add_random_noise)
     label_dict = train_data_tgt.label_dict
 
@@ -197,6 +212,7 @@ if __name__ == '__main__':
     parser.add_argument('--tgt_dataset', type=str, default='', help='target dataset path')
     parser.add_argument('--test_dataset', type=str, default='', help='test dataset path')
 
+    parser.add_argument('--src_img_size', type=int, default=0, help='The size of image: H and W')
     parser.add_argument('--tgt_img_size', type=int, default=256, help='The size of image: H and W')
     parser.add_argument('--tgt_crop_size', type=int, default=256, help='The size of cropped image: H and W')
     parser.add_argument('--workers', type=int, default=1, help='The number of workers for dataloader')
