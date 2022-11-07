@@ -24,6 +24,7 @@ CUDA_VISIBLE_DEVICES=1 python train.py \
     --patch_size 96 \
     --stride 48 \
     --top_k 32 \
+    --assigned_labels 5 \
     --g_adv_weight 1.5 \
     --d_adv_weight 1.5 \
     --g_patch_adv_weight 1.0 \

@@ -105,11 +105,12 @@ def main(conf):
                           , T.Normalize(mean=mean, std=std)]
     test_transform = T.Compose(test_transform)
 
-    train_data_tgt = ImageClassDataset(conf.tgt_dataset
-                                       , train_transform
-                                       , sample_size=1
-                                       , assigned_labels=[6] # kaka
-                                       , assigned_transform=[train_assigned_transform])
+    train_data_tgt = ImageClassDataset(conf.tgt_dataset,
+                                       train_transform,
+                                       sample_size=1,
+                                       assigned_labels=conf.assigned_labels if conf.assigned_labels is not None else [],
+                                       assigned_transform=[train_assigned_transform for _ in
+                                                           range(len(conf.assigned_labels))])
     test_data_src = ImageDataset(conf.test_dataset, test_transform, random_noise=conf.add_random_noise)
     label_dict = train_data_tgt.label_dict
 
@@ -225,6 +226,7 @@ if __name__ == '__main__':
     parser.add_argument('--db_number', type=int, default=4, help='The number of Dynamic ResBlock')
     parser.add_argument('--ws', type=int, default=64, help='The window size of SW-LIN Decoder')
     parser.add_argument('--M', type=int, default=2, help='The number of style reference image for Discriminator')
+    parser.add_argument('--assigned_labels', type=int, nargs='+', help='assigned labels for specific transform')
 
     parser.add_argument('--sample_dir', type=str, default='samples',
                         help='Directory name to save the samples on training')

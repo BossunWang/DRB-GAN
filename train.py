@@ -234,10 +234,11 @@ def train(conf):
     test_transform = T.Compose(test_transform)
 
     train_data_src = ImageDataset(conf.src_dataset, train_transform)
-    train_data_tgt = ImageClassDataset(conf.tgt_dataset, train_transform
-                                       , sample_size=conf.M + 1
-                                       , assigned_labels=[5] # kaka
-                                       , assigned_transform=[train_assigned_transform])
+    train_data_tgt = ImageClassDataset(conf.tgt_dataset, train_transform,
+                                       sample_size=conf.M + 1,
+                                       assigned_labels=conf.assigned_labels if conf.assigned_labels is not None else [],
+                                       assigned_transform=[train_assigned_transform for _ in
+                                                             range(len(conf.assigned_labels))])
     test_data_src = ImageDataset(conf.test_dataset, test_transform)
     label_dict = train_data_tgt.label_dict
 
@@ -446,6 +447,7 @@ if __name__ == '__main__':
     parser.add_argument('--patch_size', type=int, default=96, help='The number of patch size for patch extractor')
     parser.add_argument('--stride', type=int, default=48, help='The number of stride for patch extractor')
     parser.add_argument('--top_k', type=int, default=32, help='The number of top k for patch extractor')
+    parser.add_argument('--assigned_labels', type=int, nargs='+', help='assigned labels for specific transform')
 
     parser.add_argument('--g_adv_weight', type=float, default=1.0, help='Weight about Generator loss')
     parser.add_argument('--d_adv_weight', type=float, default=1.0, help='Weight about Discriminator loss')
