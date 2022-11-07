@@ -19,13 +19,10 @@ def make_dataset(dir_list):
 if __name__ == '__main__':
     train_dir_list = ["/media/glory/Transcend/Dataset/Scene/DIV2K_HR/origin"
                       , "/media/glory/Transcend/Dataset/Scene/Flickr2K-001/Flickr2K"
-                      , "/media/glory/Transcend/Dataset/Scene/Flickr1024/Train"
                       , "/media/glory/Transcend/Dataset/Scene/landscape_set"
-                      , "/media/glory/46845c74-37f7-48d7-8b72-e63c83fa4f68/Animal_dataset/train"]
+                      , "/media/glory/46845c74-37f7-48d7-8b72-e63c83fa4f68/Animal_dataset/train/afhq_train"]
     test_dir_list = ["/media/glory/Transcend/Dataset/Scene/DIV2K_valid_HR"
-                     , "/media/glory/Transcend/Dataset/Scene/Flickr1024/Validation"
-                     , "/media/glory/Transcend/Dataset/Scene/Flickr1024/Test"
-                     , "/media/glory/46845c74-37f7-48d7-8b72-e63c83fa4f68/Animal_dataset/val"]
+                     , "/media/glory/46845c74-37f7-48d7-8b72-e63c83fa4f68/Animal_dataset/val/afhg_val"]
 
     train_img_list = make_dataset(train_dir_list)
     test_img_list = make_dataset(test_dir_list)

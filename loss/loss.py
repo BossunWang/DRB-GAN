@@ -70,6 +70,8 @@ class DRBGANLoss:
         self.bce_loss = nn.BCELoss()
         self.wadvg = args.g_adv_weight
         self.wadvd = args.d_adv_weight
+        self.wadvg_patch = args.g_patch_adv_weight
+        self.wadvd_patch = args.d_patch_adv_weight
         self.wcon = args.con_weight
         self.wsty = args.sty_weight
         self.wcls = args.class_weight
@@ -77,7 +79,7 @@ class DRBGANLoss:
         self.vgg19 = vgg19
         self.adv_type = args.gan_loss
 
-    def compute_loss_G(self, fake_img, img, style_img, fake_logit, style_logit, style_label, mixed_precision=False):
+    def compute_loss_G(self, fake_img, img, style_img, fake_logit, fake_patch_logit, style_logit, style_label, mixed_precision=False):
         '''
         Compute loss for Generator
         @Arugments:
@@ -85,6 +87,7 @@ class DRBGANLoss:
             - img: image
             - style_img: target style image
             - fake_logit: output of Discriminator given fake image
+            - fake_patch_logit: output of Discriminator patch given fake image
             - style_logit: output of AuxiliaryClassifier given style image
             - style_label: ground truth of class labels given style image
         @Returns:
@@ -110,6 +113,7 @@ class DRBGANLoss:
 
             return [
                 self.wadvg * self.adv_loss_g(fake_logit),
+                self.wadvg_patch * self.adv_loss_g(fake_patch_logit),
                 self.wper * per_loss,
                 self.wcls * style_cls_loss,
                 content_loss,
@@ -118,6 +122,10 @@ class DRBGANLoss:
 
     def compute_loss_D(self, fake_img_logits, real_img_logits):
         loss = self.wadvd * self.adv_loss_d(fake_img_logits, real_img_logits)
+        return loss
+
+    def compute_loss_D_patch(self, fake_patch_logits, real_patch_logits):
+        loss = self.wadvd_patch * self.adv_loss_d(fake_patch_logits, real_patch_logits)
         return loss
 
     def content_loss_vgg(self, image, recontruction):
@@ -136,6 +144,8 @@ class DRBGANLoss:
                 all1 = Variable(torch.ones_like(real_img_logit.data).cuda(), requires_grad=False)
                 loss += torch.mean(F.binary_cross_entropy_with_logits(fake_img_logit, all0) +
                                    F.binary_cross_entropy_with_logits(real_img_logit, all1))
+            elif self.adv_type == 'hinge':
+                loss += torch.mean(F.relu(1. - real_img_logit)) + torch.mean(F.relu(1. + fake_img_logit))
             else:
                 assert 0, "Unsupported GAN type: {}".format(self.adv_type)
 
@@ -149,6 +159,8 @@ class DRBGANLoss:
             elif self.adv_type == 'nsgan':
                 all1 = Variable(torch.ones_like(out0.data).cuda(), requires_grad=False)
                 loss += torch.mean(F.binary_cross_entropy_with_logits(out0, all1))
+            elif self.adv_type == 'hinge':
+                loss += -torch.mean(out0)
             else:
                 assert 0, "Unsupported GAN type: {}".format(self.adv_type)
 

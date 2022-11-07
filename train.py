@@ -14,6 +14,7 @@ from functools import partial
 
 abs_path = os.getcwd().split('DRB-GAN')[0]
 sys.path.append(os.path.join(abs_path, 'DRB-GAN', "model"))
+sys.path.append(os.path.join(abs_path, 'DRB-GAN', "tools"))
 
 import torch
 from torch import optim
@@ -29,6 +30,8 @@ from model.vgg_nets import Vgg19
 from loss.loss import DRBGANLoss
 from utils.AverageMeter import AverageMeter
 from utils.utils import init_seeds, worker_init_fn, get_lr
+from tools.patch_extractor import extract_top_k_img_patches_by_sum
+from tools.guided_filter import GuidedFilter
 
 
 def set_logging(rank=-1):
@@ -39,9 +42,9 @@ def set_logging(rank=-1):
 
 
 def train_one_iter(source, targets, target_labels
-                   , style_encoder, generator, discriminator
+                   , style_encoder, generator, discriminator, discriminator_patch, gf
                    , criterion, G_optimizer, D_optimizer, scaler
-                   , discriminator_loss_meter, generator_loss_meter
+                   , discriminator_loss_meter, discriminator_patch_loss_meter, generator_loss_meter
                    , content_loss_meter, style_loss_meter, per_loss_meter, style_cls_loss_meter
                    , it, conf, update_G_only=False):
     batch_size, C, H, W = source.size()
@@ -53,10 +56,19 @@ def train_one_iter(source, targets, target_labels
     collection_targets = targets[:, C:, :, :]
     target_label = target_labels[0][0]
 
+    style_dummy_inputs = torch.rand(1, 0, conf.patch_size, conf.patch_size).to(conf.device)
+
     # generate fake image
     with torch.cuda.amp.autocast(enabled=conf.mixed_precision):
         style_prob, style_gamma, style_beta, style_omega = style_encoder(target, target_label.unsqueeze(0))
         fake_img = generator(source, style_gamma, style_beta, style_omega)
+
+        # extract patches
+        top_k_target_patches = extract_top_k_img_patches_by_sum(target, conf.patch_size, conf.stride, conf.top_k, gf)
+        target_patches_gray = torch.sum(top_k_target_patches, dim=1, keepdims=True) / 3
+
+        top_k_fake_patches = extract_top_k_img_patches_by_sum(fake_img, conf.patch_size, conf.stride, conf.top_k, gf)
+        fake_patches_gray = torch.sum(top_k_fake_patches, dim=1, keepdims=True) / 3
 
     # training rate: G : D = self.training_rate : 1
     if not update_G_only:
@@ -64,10 +76,14 @@ def train_one_iter(source, targets, target_labels
         with torch.cuda.amp.autocast(enabled=conf.mixed_precision):
             # from true distribution
             real_prep = discriminator(target, collection_targets, False)
+            real_patch_prep = discriminator_patch(target_patches_gray, style_dummy_inputs, False)
             # from fake distribution
             fake_prep = discriminator(fake_img.detach(), collection_targets, False)
+            fake_patch_prep = discriminator_patch(fake_patches_gray.detach(), style_dummy_inputs, False)
+
             adv_loss_d = criterion.compute_loss_D(fake_prep, real_prep)
-            d_loss = adv_loss_d
+            adv_loss_d_patch = criterion.compute_loss_D_patch(fake_patch_prep, real_patch_prep)
+            d_loss = adv_loss_d + adv_loss_d_patch
         # backward
         D_optimizer.zero_grad()
         if conf.mixed_precision:
@@ -83,15 +99,17 @@ def train_one_iter(source, targets, target_labels
     # Update G
     with torch.cuda.amp.autocast(enabled=conf.mixed_precision):
         fake_prep = discriminator(fake_img, collection_targets, False)
-        adv_loss_g, per_loss, style_cls_loss, content_loss, style_loss \
+        fake_patch_prep = discriminator_patch(fake_patches_gray, style_dummy_inputs, False)
+        adv_loss_g, adv_loss_g_patch, per_loss, style_cls_loss, content_loss, style_loss \
             = criterion.compute_loss_G(fake_img
                                        , source
                                        , target
                                        , fake_prep
+                                       , fake_patch_prep
                                        , style_prob
                                        , target_label.unsqueeze(0)
                                        , mixed_precision=conf.mixed_precision)
-        g_loss = adv_loss_g + per_loss + style_cls_loss
+        g_loss = adv_loss_g + adv_loss_g_patch + per_loss + style_cls_loss
 
     # backward
     G_optimizer.zero_grad()
@@ -218,7 +236,7 @@ def train(conf):
     train_data_src = ImageDataset(conf.src_dataset, train_transform)
     train_data_tgt = ImageClassDataset(conf.tgt_dataset, train_transform
                                        , sample_size=conf.M + 1
-                                       , assigned_labels=[6] # kaka
+                                       , assigned_labels=[5] # kaka
                                        , assigned_transform=[train_assigned_transform])
     test_data_src = ImageDataset(conf.test_dataset, test_transform)
     label_dict = train_data_tgt.label_dict
@@ -258,6 +276,7 @@ def train(conf):
     num_classes = len(train_data_tgt)
 
     logger.info('training data size: %d', len(train_loader_src))
+    logger.info('testing data size: %d', len(test_loader_src))
     logger.info('num_classes: %d', num_classes)
 
     # model setting
@@ -275,14 +294,21 @@ def train(conf):
                                               , conf.omega_dim
                                               , conf.db_number, conf.ws).to(conf.device)
     discriminator = Discriminator(conf.M + 1).to(conf.device)
+    discriminator_patch = Discriminator(1, input_dim=1).to(conf.device)
+    gf = GuidedFilter(r=5, eps=0.2).to(conf.device)
 
     # optimizer setting
     generator_group_dict = [
         {"params": style_encoding_net.parameters(), "weight_decay": 5e-4},
         {"params": style_transfer_net.parameters(), "weight_decay": 5e-4},
     ]
+
+    discriminator_group_dict = [
+        {"params": discriminator.parameters(), "weight_decay": 5e-4},
+        {"params": discriminator_patch.parameters(), "weight_decay": 5e-4},
+    ]
     G_optimizer = optim.Adam(generator_group_dict, lr=conf.g_lr, betas=(0.5, 0.999))
-    D_optimizer = optim.Adam(discriminator.parameters(), lr=conf.d_lr, betas=(0.5, 0.999))
+    D_optimizer = optim.Adam(discriminator_group_dict, lr=conf.d_lr, betas=(0.5, 0.999))
 
     # loss setting
     criterion = DRBGANLoss(conf, VGG)
@@ -296,6 +322,7 @@ def train(conf):
                 and "style_encoder" in checkpoint \
                 and "generator" in checkpoint \
                 and "discriminator" in checkpoint \
+                and "discriminator_patch" in checkpoint \
                 and "G_optimizer" in checkpoint \
                 and "D_optimizer" in checkpoint:
             logger.info('load model')
@@ -303,6 +330,7 @@ def train(conf):
             style_encoding_net.load_state_dict(checkpoint['style_encoder'])
             style_transfer_net.load_state_dict(checkpoint['generator'])
             discriminator.load_state_dict(checkpoint['discriminator'])
+            discriminator_patch.load_state_dict(checkpoint['discriminator_patch'])
             G_optimizer.load_state_dict(checkpoint['G_optimizer'])
             D_optimizer.load_state_dict(checkpoint['D_optimizer'])
         del checkpoint
@@ -310,8 +338,10 @@ def train(conf):
     style_encoder = torch.nn.DataParallel(style_encoding_net)
     generator = torch.nn.DataParallel(style_transfer_net)
     discriminator = torch.nn.DataParallel(discriminator)
+    discriminator_patch = torch.nn.DataParallel(discriminator_patch)
 
     discriminator_loss_meter = AverageMeter()
+    discriminator_patch_loss_meter = AverageMeter()
     generator_loss_meter = AverageMeter()
     content_loss_meter = AverageMeter()
     style_loss_meter = AverageMeter()
@@ -325,6 +355,8 @@ def train(conf):
         style_encoder.train()
         generator.train()
         discriminator.train()
+        discriminator_patch.train()
+
         try:
             content_image = next(source_train_batch_iterator)
         except StopIteration:
@@ -342,9 +374,9 @@ def train(conf):
             update_G_only = False
 
         train_one_iter(content_image, style_images, style_labels
-                       , style_encoder, generator, discriminator
+                       , style_encoder, generator, discriminator, discriminator_patch, gf
                        , criterion, G_optimizer, D_optimizer, scaler
-                       , discriminator_loss_meter, generator_loss_meter
+                       , discriminator_loss_meter, discriminator_patch_loss_meter, generator_loss_meter
                        , content_loss_meter, style_loss_meter, per_loss_meter, style_cls_loss_meter
                        , it, conf, update_G_only)
 
@@ -411,9 +443,14 @@ if __name__ == '__main__':
     parser.add_argument('--db_number', type=int, default=4, help='The number of Dynamic ResBlock')
     parser.add_argument('--ws', type=int, default=64, help='The window size of SW-LIN Decoder')
     parser.add_argument('--M', type=int, default=2, help='The number of style reference image for Discriminator')
+    parser.add_argument('--patch_size', type=int, default=96, help='The number of patch size for patch extractor')
+    parser.add_argument('--stride', type=int, default=48, help='The number of stride for patch extractor')
+    parser.add_argument('--top_k', type=int, default=32, help='The number of top k for patch extractor')
 
     parser.add_argument('--g_adv_weight', type=float, default=1.0, help='Weight about Generator loss')
     parser.add_argument('--d_adv_weight', type=float, default=1.0, help='Weight about Discriminator loss')
+    parser.add_argument('--g_patch_adv_weight', type=float, default=1.0, help='Weight about Generator patch loss')
+    parser.add_argument('--d_patch_adv_weight', type=float, default=1.0, help='Weight about Discriminator patch loss')
     parser.add_argument('--con_weight', type=float, default=1.0, help='Weight about VGG19')
     parser.add_argument('--sty_weight', type=float, default=0.02, help='Weight about style')
     parser.add_argument('--perceptual_weight', type=float, default=1.0, help='Weight about perceptual loss')
