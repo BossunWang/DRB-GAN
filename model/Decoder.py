@@ -1,19 +1,18 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-from basic_layer import SW_LIN
+from basic_layer import SW_LIN, ILN
 
 
-class SW_LIN_Decoder(nn.Module):
-    def __init__(self, in_channels, ws):
-        super(SW_LIN_Decoder, self).__init__()
+class Decoder(nn.Module):
+    def __init__(self, in_channels):
+        super(Decoder, self).__init__()
 
         cfg = [in_channels // 2, in_channels // 4]
-        ws_group = [ws, ws * 2]
         layers = []
-        for i, (v, ws) in enumerate(zip(cfg, ws_group)):
+        for i, v in enumerate(cfg):
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, stride=1, padding=0)
-            layers += [nn.Sequential(nn.ReflectionPad2d(1), conv2d, SW_LIN(v, ws), nn.ReLU(inplace=True))]
+            layers += [nn.Sequential(nn.ReflectionPad2d(1), conv2d, ILN(v), nn.ReLU(inplace=True))]
             in_channels = v
 
         self.decode_layer = nn.ModuleList(layers)

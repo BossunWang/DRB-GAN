@@ -53,13 +53,13 @@ if __name__ == '__main__':
 
     patch_size = 96
     stride = 48
-    k = 10
+    k = 8
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     gf = GuidedFilter(r=5, eps=0.2).to(device)
 
     image = cv2.imread(
         "/media/glory/46845c74-37f7-48d7-8b72-e63c83fa4f68/Style_Transfer/art_dataset_v2/kaka/136964374_447443723304110_7976762053155757037_n.jpg")
-    image = cv2.resize(image, (512, 512))
+    image = cv2.resize(image, (256, 256))
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) / 255.0
     image = (image - 0.5) / 0.5
     image = torch.from_numpy(image.transpose((2, 0, 1))[None]).float().to(device)

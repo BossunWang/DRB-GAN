@@ -1,40 +1,40 @@
-mkdir 'log_DRB_GAN_edge_patch_animal_scene_style_data_v3'
+mkdir 'log_DRB_GAN_edge_patch_style_data_v2'
 CUDA_VISIBLE_DEVICES=1 python train.py \
-    --src_dataset "data/train.txt" \
-    --tgt_dataset "../art_dataset_v3" \
-    --test_dataset "data/test.txt" \
+    --src_dataset "/media/glory/Transcend/Dataset/Scene/Photo_image_training_data" \
+    --tgt_dataset "../art_dataset_v2" \
+    --test_dataset "/media/glory/Transcend/Dataset/Scene/DIV2K_valid_HR" \
     --iter 500000 \
     --batch_size 1 \
     --training_rate 1 \
-    --img_size 512 \
-    --crop_size 512 \
+    --img_size 256 \
+    --crop_size 256 \
     --workers 1 \
     --print_freq 5000 \
     --save_freq 100000 \
     --g_lr 0.0001 \
     --d_lr 0.0001 \
-    --feature_dim 655360 \
-    --gamma_dim 128 \
-    --beta_dim 128 \
-    --omega_dim 4 \
-    --encoder_out_ch 128 \
-    --db_number 4 \
+    --feature_dim 163840 \
+    --gamma_dim 64 \
+    --beta_dim 64 \
+    --omega_dim 64 \
+    --encoder_out_ch 64 \
+    --db_number 8 \
     --ws 128 \
-    --M 2 \
+    --M 0 \
     --patch_size 96 \
     --stride 48 \
-    --top_k 32 \
-    --assigned_labels 5 \
-    --g_adv_weight 1.5 \
-    --d_adv_weight 1.5 \
-    --g_patch_adv_weight 1.0 \
-    --d_patch_adv_weight 1.0 \
+    --top_k 8 \
+    --assigned_labels 6 \
+    --g_adv_weight 5.0 \
+    --d_adv_weight 5.0 \
+    --g_patch_adv_weight 5.0 \
+    --d_patch_adv_weight 5.0 \
     --con_weight 1.0 \
-    --sty_weight 0.05 \
+    --sty_weight 0.01 \
     --perceptual_weight 1. \
     --class_weight 1. \
     --gan_loss "hinge" \
-    --checkpoint_dir "checkpoint_DRB_GAN_edge_patch_animal_scene_style_data_v3" \
-    --log_dir "log_DRB_GAN_edge_patch_animal_scene_style_data_v3" \
-    --sample_dir "samples_DRB_GAN_edge_patch_animal_scene_style_data_v3"
+    --checkpoint_dir "checkpoint_DRB_GAN_edge_patch_style_data_v2" \
+    --log_dir "log_DRB_GAN_edge_patch_style_data_v2" \
+    --sample_dir "samples_DRB_GAN_edge_patch_style_data_v2"
 

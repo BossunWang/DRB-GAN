@@ -2,15 +2,15 @@ import torch
 from torch import nn
 
 from DynamicConv import AdaDynamicConv
-from SW_LIN_Decoder import SW_LIN_Decoder
-from basic_layer import Conv2dBlock, AdaIN
+from Decoder import Decoder
+from basic_layer import Conv2dBlock, AdaILN
 
 
 class ContentEncoder(nn.Module):
     def __init__(self, out_channels):
         super(ContentEncoder, self).__init__()
 
-        cfg = [64, out_channels]
+        cfg = [32, out_channels]
         layers = []
         in_channels = 3
         for v in cfg:
@@ -30,23 +30,24 @@ class DynamicResBlock(nn.Module):
         super(DynamicResBlock, self).__init__()
 
         assert gamma_dim == beta_dim
+        assert gamma_dim == omega_dim
         self.use_res_connect = in_ch == out_ch
         bottleneck = gamma_dim
         self.padd_layer = nn.ReflectionPad2d(1)
-        self.conv_layer = nn.Conv2d(in_ch, bottleneck, kernel_size=3, stride=1, padding=0, bias=False)
-        self.adin_layer = AdaIN()
+        self.conv_layer1 = nn.Conv2d(in_ch, bottleneck, kernel_size=3, stride=1, padding=0, bias=False)
+        self.normal_layer1 = AdaILN(bottleneck)
         self.relu_layer = nn.ReLU(inplace=True)
-        self.dy_conv_layer = AdaDynamicConv(in_planes=bottleneck, out_planes=out_ch
-                                            , kernel_size=3, stride=1, padding=1, K=omega_dim, init_weight=True)
-        self.in_layer = nn.InstanceNorm2d(out_ch)
+        self.conv_layer2 = nn.Conv2d(bottleneck, out_ch, kernel_size=3, stride=1, padding=0, bias=False)
+        self.normal_layer2 = AdaILN(bottleneck)
 
     def forward(self, input, style_gamma_code, style_beta_code, style_omega_code):
         out = self.padd_layer(input)
-        out = self.conv_layer(out)
-        out = self.adin_layer(out, style_gamma_code, style_beta_code)
+        out = self.conv_layer1(out)
+        out = self.normal_layer1(out, style_gamma_code, style_beta_code, style_omega_code)
         out = self.relu_layer(out)
-        out = self.dy_conv_layer(out, style_omega_code)
-        out = self.in_layer(out)
+        out = self.padd_layer(out)
+        out = self.conv_layer2(out)
+        out = self.normal_layer2(out, style_gamma_code, style_beta_code, style_omega_code)
         if self.use_res_connect:
             out = input + out
         return out
@@ -65,7 +66,7 @@ class StyleTransferNetwork(nn.Module):
         self.res_layers = nn.ModuleList(
             DynamicResBlock(enc_out_ch, gamma_dim, beta_dim, omega_dim, enc_out_ch) for _ in range(db_number))
 
-        self.decoder = SW_LIN_Decoder(enc_out_ch, ws)
+        self.decoder = Decoder(enc_out_ch)
 
     def forward(self, x, style_gamma_code, style_beta_code, style_omega_code):
         content_feature = self.content_encoder(x)
@@ -82,17 +83,16 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     num_classes = 4
-    encoder_out_ch = 128
-    gamma_dim = 128
-    beta_dim = 128
-    omega_dim = 4
-    K = 4
-    db_number = K
+    encoder_out_ch = 64
+    gamma_dim = 64
+    beta_dim = 64
+    omega_dim = 64
+    db_number = 8
     ws = 64
     style_transfer_net \
         = StyleTransferNetwork(encoder_out_ch, gamma_dim, beta_dim, omega_dim, db_number, ws).to(device)
 
-    content_input = torch.rand(1, 3, 512, 512).to(device)
+    content_input = torch.rand(1, 3, 256, 256).to(device)
     style_gamma = torch.rand(1, gamma_dim).to(device)
     style_beta = torch.rand(1, beta_dim).to(device)
     style_omega = torch.rand(1, omega_dim).to(device)
