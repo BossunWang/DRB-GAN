@@ -55,3 +55,7 @@ https://openaccess.thecvf.com/content/ICCV2021/papers/Xu_DRB-GAN_A_Dynamic_ResBl
 ![umap](analysis/style_cluster_v2/style_feature_UMAP.jpg)
 ### TSNE for style codes
 ![tsne](analysis/style_cluster_v2/style_feature_tsne.jpg)
+
+## Preprocess
+### Observation
+* The filters of blur image like Rolling Guidance Filter and Guided Filter are generated artifact(rectangle patters and raster effect on contours)
