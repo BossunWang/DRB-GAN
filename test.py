@@ -111,7 +111,10 @@ def main(conf):
                                        assigned_labels=conf.assigned_labels if conf.assigned_labels is not None else [],
                                        assigned_transform=[train_assigned_transform for _ in
                                                            range(len(conf.assigned_labels))])
-    test_data_src = ImageDataset(conf.test_dataset, test_transform, random_noise=conf.add_random_noise)
+    test_data_src = ImageDataset(conf.test_dataset
+                                 , test_transform
+                                 , random_noise=conf.add_random_noise
+                                 , use_sharpen=conf.use_sharpen)
     label_dict = train_data_tgt.label_dict
 
     # create folders
@@ -244,6 +247,7 @@ if __name__ == '__main__':
     parser.add_argument('--mixture_weights', type=float, nargs='+')
     parser.add_argument('--sample_compared', action='store_true', default=False)
     parser.add_argument('--add_random_noise', action='store_true', default=False)
+    parser.add_argument('--use_sharpen', action='store_true', default=False)
     args = parser.parse_args()
 
     assert len(args.mixture_list) == len(args.mixture_weights), "mixture_list and mixture_weights should be same size"

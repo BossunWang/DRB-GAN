@@ -7,6 +7,7 @@
 import os
 import numpy as np
 from PIL import Image
+import cv2
 import torch
 from torch.utils.data import Dataset
 from pathlib import Path
@@ -29,7 +30,7 @@ def make_dataset(dir):
 
 
 class ImageDataset(Dataset):
-    def __init__(self, data_file, transform, get_path=False, random_noise=False):
+    def __init__(self, data_file, transform, get_path=False, random_noise=False, use_sharpen=False):
         if os.path.isdir(data_file):
             self.files = make_dataset(data_file)
         else:
@@ -41,6 +42,7 @@ class ImageDataset(Dataset):
         self.transform = transform
         self.get_path = get_path
         self.random_noise = random_noise
+        self.use_sharpen = use_sharpen
 
     def __len__(self):
         return len(self.files)
@@ -51,10 +53,20 @@ class ImageDataset(Dataset):
         image_add = np.clip(image_add, 0, 255).astype(np.uint8)
         return image_add
 
+    def sharpen(self, img, sigma=100):
+        # sigma = 5、15、25
+        blur_img = cv2.GaussianBlur(img, (0, 0), sigma)
+        usm = cv2.addWeighted(img, 1.5, blur_img, -0.5, 0)
+
+        return usm
+
     def to_Tensor(self, image_path):
         image = Image.open(image_path).convert('RGB')
+        if self.use_sharpen:
+            image = self.sharpen(np.array(image))
         if self.random_noise:
             image = self.add_g(np.array(image), var=200)
+
         image = self.transform(image)
         return image
 

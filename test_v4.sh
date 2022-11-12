@@ -66,6 +66,28 @@
 #    --mixture_weights 0.5 0.5 \
 #    --sample_compared
 
+#CUDA_VISIBLE_DEVICES=0 python test.py \
+#    --test_dataset "../Stable_Diffusion_Demo" \
+#    --tgt_dataset "../art_dataset_v2" \
+#    --tgt_img_size 256 \
+#    --tgt_crop_size 256 \
+#    --workers 1 \
+#    --feature_dim 163840 \
+#    --gamma_dim 64 \
+#    --beta_dim 64 \
+#    --omega_dim 64 \
+#    --encoder_out_ch 64 \
+#    --db_number 8 \
+#    --ws 128 \
+#    --M 0 \
+#    --assigned_labels 6 \
+#    --sample_dir "train_log_v4/stylized_Stable_Diffusion_Demo_add_random_noise" \
+#    --save_extend ".png" \
+#    --pretrain_model "train_log_v4/checkpoint_DRB_GAN_edge_patch_style_data_v2/DRBGAN_it_499999.pt" \
+#    --mixture_list "LOUIS WAIN" "kaka" \
+#    --mixture_weights 0.5 0.5 \
+#    --add_random_noise
+
 CUDA_VISIBLE_DEVICES=0 python test.py \
     --test_dataset "../Stable_Diffusion_Demo" \
     --tgt_dataset "../art_dataset_v2" \
@@ -81,9 +103,10 @@ CUDA_VISIBLE_DEVICES=0 python test.py \
     --ws 128 \
     --M 0 \
     --assigned_labels 6 \
-    --sample_dir "train_log_v4/stylized_Stable_Diffusion_Demo_add_random_noise" \
+    --sample_dir "train_log_v4/stylized_Stable_Diffusion_Demo_use_sharpen" \
     --save_extend ".png" \
     --pretrain_model "train_log_v4/checkpoint_DRB_GAN_edge_patch_style_data_v2/DRBGAN_it_499999.pt" \
     --mixture_list "LOUIS WAIN" "kaka" \
     --mixture_weights 0.5 0.5 \
-    --add_random_noise
+    --sample_compared \
+    --use_sharpen
