@@ -29,8 +29,43 @@ def make_dataset(dir):
     return images
 
 
+def gabor_filter(img, ksize=7, sigma=11, gamma=0.4, phi=0):
+    theta = 1 * np.pi / 4  # /4 shows horizontal 3/4 shows other horizontal. Try other contributions
+    lamda = 1 * np.pi / 4  # 1/4 works best for angled.
+
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    out = np.zeros_like(img)
+
+    for i in range(4):
+        t = theta * i
+        kernel = cv2.getGaborKernel((ksize, ksize), sigma, t, lamda, gamma, phi, ktype=cv2.CV_32F)
+        fimg = cv2.filter2D(img, cv2.CV_8UC3, kernel)
+        fimg = np.clip(fimg, 0, 255)
+        fimg = fimg.astype(np.uint8)
+        out += fimg
+
+    out = cv2.cvtColor(out, cv2.COLOR_GRAY2RGB)
+    return out
+
+
+def add_g(image_array, mean=0.0, var=30):
+    std = var ** 0.5
+    image_add = image_array + np.random.normal(mean, std, image_array.shape)
+    image_add = np.clip(image_add, 0, 255).astype(np.uint8)
+    return image_add
+
+
+def sharpen(img, sigma=100):
+    # sigma = 5、15、25
+    blur_img = cv2.GaussianBlur(img, (0, 0), sigma)
+    usm = cv2.addWeighted(img, 1.5, blur_img, -0.5, 0)
+
+    return usm
+
+
 class ImageDataset(Dataset):
-    def __init__(self, data_file, transform, get_path=False, random_noise=False, use_sharpen=False):
+    def __init__(self, data_file, transform
+                 , get_path=False, random_noise=False, use_sharpen=False, random_contour_noise=False):
         if os.path.isdir(data_file):
             self.files = make_dataset(data_file)
         else:
@@ -43,29 +78,22 @@ class ImageDataset(Dataset):
         self.get_path = get_path
         self.random_noise = random_noise
         self.use_sharpen = use_sharpen
+        self.random_contour_noise = random_contour_noise
 
     def __len__(self):
         return len(self.files)
 
-    def add_g(self, image_array, mean=0.0, var=30):
-        std = var ** 0.5
-        image_add = image_array + np.random.normal(mean, std, image_array.shape)
-        image_add = np.clip(image_add, 0, 255).astype(np.uint8)
-        return image_add
-
-    def sharpen(self, img, sigma=100):
-        # sigma = 5、15、25
-        blur_img = cv2.GaussianBlur(img, (0, 0), sigma)
-        usm = cv2.addWeighted(img, 1.5, blur_img, -0.5, 0)
-
-        return usm
-
     def to_Tensor(self, image_path):
         image = Image.open(image_path).convert('RGB')
         if self.use_sharpen:
-            image = self.sharpen(np.array(image))
+            image = sharpen(np.array(image))
+        if self.random_contour_noise:
+            mask = gabor_filter(np.array(image)) / 255.
+            noise_image = add_g(np.array(image), var=200)
+            image = (1. - mask) * np.array(image) + mask * noise_image
+            image = np.clip(image, 0, 255).astype(np.uint8)
         if self.random_noise:
-            image = self.add_g(np.array(image), var=200)
+            image = add_g(np.array(image), var=200)
 
         image = self.transform(image)
         return image

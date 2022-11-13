@@ -25,7 +25,7 @@ https://openaccess.thecvf.com/content/ICCV2021/papers/Xu_DRB-GAN_A_Dynamic_ResBl
 - [X] Explore data analysis using v2 model: cluster of style features, style classifier predicted labels difference from true label
 - [X] Training with fp16 (not actually save any memory space)
 - [ ] Observer How to converge
-- [ ] Rolling Guidance Filter, Guided Filter, Gabor Filter
+- [X] Rolling Guidance Filter, Guided Filter, Gabor Filter
 - [X] Evaluation Metric: LPIPS, ArtFID, SIFID
 - [ ] AdaWCT, FastDifferentiableMatSqrt
 - [ ] Weighted averaging strategy for collection style transfer
@@ -59,3 +59,4 @@ https://openaccess.thecvf.com/content/ICCV2021/papers/Xu_DRB-GAN_A_Dynamic_ResBl
 ## Preprocess
 ### Observation
 * The filters of blur image like Rolling Guidance Filter and Guided Filter are generated artifact(rectangle patters and raster effect on contours)
+* Add random noise on contours by Gabor Filter is generated artifact(raster effect on contours), if using noise on non-contours same result as add_random_noise
