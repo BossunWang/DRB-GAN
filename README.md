@@ -60,3 +60,4 @@ https://openaccess.thecvf.com/content/ICCV2021/papers/Xu_DRB-GAN_A_Dynamic_ResBl
 ### Observation
 * The filters of blur image like Rolling Guidance Filter and Guided Filter are generated artifact(rectangle patters and raster effect on contours)
 * Add random noise on contours by Gabor Filter is generated artifact(raster effect on contours), if using noise on non-contours same result as add_random_noise
+* original architecture not stable when adversarial weight up to 5.0 and generated artifact(rectangle patters and raster effect on contours)
